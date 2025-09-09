@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { checkCredits, deductCredits, getCurrentUser, isPlanExpired } from '@/lib/auth'
+import { deductCredits, getCurrentUser, isPlanExpired } from '@/lib/auth'
 import { createServerActionClient } from '@/lib/supabase'
 import { findEmail, type EmailFinderRequest } from '@/lib/services/email-finder'
 
@@ -21,6 +21,15 @@ interface BulkFindResult {
   user_name?: string
   mx?: string
   domain?: string
+}
+
+interface ExportRow {
+  catch_all?: boolean
+  user_name?: string
+  domain?: string
+  email?: string
+  status?: string
+  mx?: string
 }
 
 
@@ -97,7 +106,6 @@ export async function processBulkFind(requests: BulkFindRequest[]): Promise<Bulk
     }
     
     const results: BulkFindResult[] = []
-    let processedEmails = 0 // Count of emails that were processed (attempted to find)
     
     // Process each request
     for (const request of requests) {
@@ -121,10 +129,6 @@ export async function processBulkFind(requests: BulkFindRequest[]): Promise<Bulk
       }
       
       results.push(result)
-      
-      // Count all processed emails (regardless of outcome)
-      // "Processed emails" means emails that were submitted to the email finder service
-      processedEmails++
     }
     
     // Revalidate to update credits display
@@ -141,7 +145,7 @@ export async function processBulkFind(requests: BulkFindRequest[]): Promise<Bulk
   }
 }
 
-export async function exportResults(rows: any[]): Promise<string> {
+export async function exportResults(rows: ExportRow[]): Promise<string> {
   // Convert rows to CSV format with new columns
   const headers = ['Catch All', 'User Name', 'Domain', 'Email', 'Status', 'MX']
   const csvRows = [headers.join(',')]

@@ -27,6 +27,12 @@ interface BulkRow {
   error?: string
 }
 
+interface CsvRow {
+  'Full Name'?: string
+  'Domain'?: string
+  'Role'?: string
+}
+
 export default function BulkFinderPage() {
   const [rows, setRows] = useState<BulkRow[]>([])
   const [currentJob, setCurrentJob] = useState<BulkFinderJob | null>(null)
@@ -108,9 +114,9 @@ export default function BulkFinderPage() {
       Papa.parse(file, {
         header: true,
         complete: (results) => {
-          const newRows: BulkRow[] = results.data
-            .filter((row: any) => row['Full Name'] && row['Domain'])
-            .map((row: any, index: number) => ({
+          const newRows: BulkRow[] = (results.data as CsvRow[])
+            .filter((row: CsvRow) => row['Full Name'] && row['Domain'])
+            .map((row: CsvRow, index: number) => ({
               id: `row-${Date.now()}-${index}`,
               fullName: row['Full Name'] || '',
               domain: row['Domain'] || '',
@@ -134,11 +140,11 @@ export default function BulkFinderPage() {
           const workbook = XLSX.read(data, { type: 'array' })
           const sheetName = workbook.SheetNames[0]
           const worksheet = workbook.Sheets[sheetName]
-          const jsonData = XLSX.utils.sheet_to_json(worksheet)
+          const jsonData = XLSX.utils.sheet_to_json(worksheet) as CsvRow[]
           
           const newRows: BulkRow[] = jsonData
-            .filter((row: any) => row['Full Name'] && row['Domain'])
-            .map((row: any, index: number) => ({
+            .filter((row: CsvRow) => row['Full Name'] && row['Domain'])
+            .map((row: CsvRow, index: number) => ({
               id: `row-${Date.now()}-${index}`,
               fullName: row['Full Name'] || '',
               domain: row['Domain'] || '',

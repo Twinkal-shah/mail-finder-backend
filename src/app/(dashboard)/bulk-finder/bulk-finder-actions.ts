@@ -3,8 +3,21 @@
 import { revalidatePath } from 'next/cache'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { getCurrentUser, checkCredits, isPlanExpired, deductCredits } from '@/lib/auth'
+import { getCurrentUser, isPlanExpired } from '@/lib/auth'
 import type { BulkFinderJob, BulkFindRequest } from './types.js'
+
+interface DatabaseJob {
+  id: string
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'paused'
+  total_requests: number
+  processed_requests: number
+  successful_finds: number
+  failed_finds: number
+  requests_data: BulkFindRequest[]
+  error_message?: string
+  created_at: string
+  updated_at: string
+}
 
 async function createSupabaseClient() {
   const cookieStore = await cookies()
@@ -247,7 +260,7 @@ export async function getUserBulkFinderJobs(): Promise<{
       }
     }
 
-    const formattedJobs: BulkFinderJob[] = jobs.map((job: any) => ({
+    const formattedJobs: BulkFinderJob[] = jobs.map((job: DatabaseJob) => ({
       jobId: job.id,
       status: job.status,
       totalRequests: job.total_requests,
