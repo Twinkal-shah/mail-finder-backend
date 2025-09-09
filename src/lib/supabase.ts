@@ -70,7 +70,7 @@ export function createMiddlewareClient(request: NextRequest) {
       get(name: string) {
         return request.cookies.get(name)?.value
       },
-      set(name: string, value: string, options: any) {
+      set(name: string, value: string, options: CookieOptions) {
         response.cookies.set({
           name,
           value,
@@ -79,7 +79,7 @@ export function createMiddlewareClient(request: NextRequest) {
           sameSite: 'lax',
         })
       },
-      remove(name: string, options: any) {
+      remove(name: string, options: CookieOptions) {
         response.cookies.set({
           name,
           value: '',

@@ -67,7 +67,7 @@ export async function getCreditUsageHistory(): Promise<CreditUsage[]> {
         // Group transactions by date and sum the usage (convert negative amounts to positive)
         const usageByDate: { [key: string]: number } = {}
         
-        creditTransactions.forEach((transaction: any) => {
+        creditTransactions.forEach((transaction) => {
           const date = new Date(transaction.created_at).toISOString().split('T')[0]
           const creditsUsed = Math.abs(transaction.amount) // Convert negative to positive
           usageByDate[date] = (usageByDate[date] || 0) + creditsUsed
