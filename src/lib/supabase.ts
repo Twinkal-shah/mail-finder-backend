@@ -41,10 +41,18 @@ export async function createServerActionClient() {
         return cookieStore.get(name)?.value
       },
       set(name: string, value: string, options: CookieOptions) {
-        cookieStore.set(name, value, options)
+        try {
+          cookieStore.set(name, value, options)
+        } catch (error) {
+          // Silently fail if cookies can't be set outside server actions
+        }
       },
       remove(name: string, options: CookieOptions) {
-        cookieStore.set(name, '', { ...options, maxAge: 0 })
+        try {
+          cookieStore.set(name, '', { ...options, maxAge: 0 })
+        } catch (error) {
+          // Silently fail if cookies can't be removed outside server actions
+        }
       },
     },
   })

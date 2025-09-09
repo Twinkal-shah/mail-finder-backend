@@ -1,13 +1,12 @@
 'use server'
 
-import { createServerActionClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createServerActionClient } from '@/lib/supabase'
 import { Database } from '@/lib/supabase'
 
 // Server action to initialize user credits
 export async function initializeUserCreditsAction(userId: string): Promise<boolean> {
   try {
-    const supabase = createServerActionClient<Database>({ cookies })
+    const supabase = await createServerActionClient()
     
     const { error } = await supabase
       .from('profiles')

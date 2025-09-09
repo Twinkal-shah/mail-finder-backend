@@ -1,4 +1,4 @@
-import { createServerActionClient } from '@/lib/supabase'
+import { createServerActionClient, createServerComponentClient } from '@/lib/supabase'
 import type { Database } from '@/lib/supabase'
 
 // Profile type from database
@@ -12,7 +12,7 @@ type User = {
 export async function getCurrentUser(): Promise<User | null> {
   console.log('getCurrentUser - Starting authentication check')
   try {
-    const supabase = await createServerActionClient()
+    const supabase = await createServerComponentClient()
     const { data: { user }, error } = await supabase.auth.getUser()
     
     if (error) {
@@ -41,7 +41,7 @@ export async function getUserProfile(): Promise<Profile | null> {
   const user = await getCurrentUser()
   if (!user) return null
   
-  const supabase = await createServerActionClient()
+  const supabase = await createServerComponentClient()
   
   // Check if plan has expired and reset credits if needed
   const planExpired = await isPlanExpired()
@@ -70,7 +70,7 @@ export async function getUserProfile(): Promise<Profile | null> {
 
 // Check if user's plan has expired
 export async function isPlanExpired(): Promise<boolean> {
-  const supabase = await createServerActionClient()
+  const supabase = await createServerComponentClient()
   const user = await getCurrentUser()
   
   if (!user) return true
@@ -117,7 +117,7 @@ export async function resetCreditsForExpiredPlan(): Promise<boolean> {
 
 // Check credits using Supabase RPC function with fallback
 export async function checkCredits(required: number): Promise<number> {
-  const supabase = await createServerActionClient()
+  const supabase = await createServerComponentClient()
   
   // First check if user is authenticated
   const user = await getCurrentUser()
@@ -338,7 +338,7 @@ export async function getCreditTransactions(limit: number = 10) {
   const user = await getCurrentUser()
   if (!user) return []
   
-  const supabase = await createServerActionClient()
+  const supabase = await createServerComponentClient()
   
   const { data: transactions, error } = await supabase
     .from('transactions')
@@ -360,7 +360,7 @@ export async function getSearchHistory(limit: number = 10) {
   const user = await getCurrentUser()
   if (!user) return []
   
-  const supabase = await createServerActionClient()
+  const supabase = await createServerComponentClient()
   
   const { data: searches, error } = await supabase
     .from('searches')
