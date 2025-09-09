@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { checkCredits, deductCredits, getCurrentUser, isPlanExpired } from '@/lib/auth'
+import { deductCredits, getCurrentUser, isPlanExpired } from '@/lib/auth'
 import { createServerActionClient } from '@/lib/supabase'
 import { verifyEmail, type EmailVerifierRequest } from '@/lib/services/email-verifier'
 
@@ -14,6 +14,7 @@ interface VerifyResult {
   domain?: string
   mx?: string
   user_name?: string
+  email?: string
 }
 
 
@@ -179,7 +180,7 @@ export async function processBulkVerify(emails: string[]): Promise<VerifyResult[
       
       // Count successful verifications (non-error status)
       if (result.status !== 'error') {
-        successfulVerifications++
+        // successfulVerifications++ // Currently not used
       }
       
       // Deduct 1 credit for each verification attempt (including errors)
@@ -211,7 +212,7 @@ export async function processBulkVerify(emails: string[]): Promise<VerifyResult[
   }
 }
 
-export async function exportVerifyResults(rows: any[]): Promise<string> {
+export async function exportVerifyResults(rows: VerifyResult[]): Promise<string> {
   // Convert rows to CSV format
   const headers = ['Email', 'Status', 'Reason']
   const csvRows = [headers.join(',')]

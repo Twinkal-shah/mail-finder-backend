@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -44,7 +44,7 @@ interface CreditTransaction {
   credits_verify_added: number
   status: string
   webhook_event: string
-  metadata?: any
+  metadata?: Record<string, unknown>
   created_at: string
 }
 
@@ -107,22 +107,7 @@ export default function CreditsPage() {
   const [isCreatingPortal, setIsCreatingPortal] = useState(false)
   const router = useRouter()
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  // Listen for focus events to reload data when user returns from payment
-  useEffect(() => {
-    const handleFocus = () => {
-      // Reload data when window regains focus (user returns from payment)
-      loadData()
-    }
-
-    window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
-  }, [])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setIsLoading(true)
       const [profileData, transactionsData, usageData] = await Promise.all([
@@ -142,14 +127,29 @@ export default function CreditsPage() {
       setTransactions(transactionsData)
       setCreditUsage(usageData || [])
     } catch (error) {
-      console.error('Failed to load data:', error)
-      toast.error('Failed to load account data')
+      console.error('Error loading data:', error)
+      toast.error('Failed to load data')
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
-  const handleSubscribe = async (plan: any) => {
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  // Listen for focus events to reload data when user returns from payment
+  useEffect(() => {
+    const handleFocus = () => {
+      // Reload data when window regains focus (user returns from payment)
+      loadData()
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [loadData])
+
+  const handleSubscribe = async (plan: { name: string; price: number; period: string; findCredits: number; verifyCredits: number }) => {
     const loadingKey = `plan-${plan.name}`
     setLoadingStates(prev => ({ ...prev, [loadingKey]: true }))
     try {
@@ -173,7 +173,7 @@ export default function CreditsPage() {
     }
   }
 
-  const handleCustomCredits = async (creditPackage: any) => {
+  const handleCustomCredits = async (creditPackage: { credits: number; price: number }) => {
     const loadingKey = `credits-${creditPackage.credits}`
     setLoadingStates(prev => ({ ...prev, [loadingKey]: true }))
     try {
@@ -209,8 +209,9 @@ export default function CreditsPage() {
           toast.success('Redirecting to billing portal...')
         }
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to open billing portal')
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to open billing portal'
+      toast.error(errorMessage)
     } finally {
       setIsCreatingPortal(false)
     }
@@ -231,8 +232,9 @@ export default function CreditsPage() {
           toast.success('Redirecting to billing portal to manage your subscription...')
         }
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to open billing portal')
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to open billing portal'
+      toast.error(errorMessage)
     } finally {
       setIsCreatingPortal(false)
     }
@@ -468,7 +470,7 @@ export default function CreditsPage() {
                   <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <p className="text-sm text-yellow-800">
                       {isExpired 
-                        ? '⚠️ Your free trial has expired. Please upgrade to continue using the service.'
+                        ? "⚠️ Your free trial has expired. Please upgrade to continue using the service."
                         : `⏰ ${daysRemaining} days remaining in your free trial.`
                       }
                     </p>

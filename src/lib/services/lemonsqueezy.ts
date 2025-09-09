@@ -1,5 +1,6 @@
-import { createServerActionClient, createServiceRoleClient } from '@/lib/supabase'
+import { createServiceRoleClient } from '@/lib/supabase'
 import crypto from 'crypto'
+import { SupabaseClient } from '@supabase/supabase-js'
 
 export interface LemonSqueezyCheckoutData {
   productId: string
@@ -242,7 +243,7 @@ export async function createLemonSqueezyPortal(
 }
 
 // Helper function to get customer portal URL from webhook data or API
-async function getCustomerPortalUrl(customerId: string, eventData: any): Promise<string | null> {
+async function getCustomerPortalUrl(customerId: string, eventData: Record<string, unknown>): Promise<string | null> {
   try {
     // First try to extract from webhook data
     const portalUrl = (eventData as any).urls?.customer_portal
@@ -416,14 +417,15 @@ export async function handleLemonSqueezyWebhook(event: LemonSqueezyWebhookEvent)
 }
 
 // Helper function to determine product type
-function determineProductType(eventName: string, attributes: any): string {
+function determineProductType(eventName: string, attributes: Record<string, unknown>): string {
   if (eventName.includes('subscription')) {
     return 'subscription'
   }
-  if (attributes.custom_data?.product_type === 'lifetime') {
+  const customData = attributes.custom_data as Record<string, unknown> | undefined;
+  if (customData?.product_type === 'lifetime') {
     return 'lifetime'
   }
-  if (attributes.custom_data?.find_credits || attributes.custom_data?.verify_credits) {
+  if (customData?.find_credits || customData?.verify_credits) {
     return 'credit_pack'
   }
   return 'credit_pack' // Default fallback
@@ -446,7 +448,15 @@ function determineTransactionStatus(eventName: string): string {
 }
 
 // Handle subscription events (created/updated)
-async function handleSubscriptionEvent(supabase: any, event: LemonSqueezyWebhookEvent, transaction: any) {
+interface TransactionData {
+  id: string;
+  credits_find_added?: number;
+  credits_verify_added?: number;
+  metadata?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+async function handleSubscriptionEvent(supabase: SupabaseClient, event: LemonSqueezyWebhookEvent, transaction: TransactionData) {
   const userId = event.data.attributes.custom_data?.user_id
   const subscriptionData = event.data.attributes
   
@@ -467,13 +477,13 @@ async function handleSubscriptionEvent(supabase: any, event: LemonSqueezyWebhook
 
   const currentFindCredits = profile?.credits_find || 0
   const currentVerifyCredits = profile?.credits_verify || 0
-  const newFindCredits = currentFindCredits + (transaction.credits_find_added || 0)
-  const newVerifyCredits = currentVerifyCredits + (transaction.credits_verify_added || 0)
+  const newFindCredits = currentFindCredits + (transaction.credits_find_added ?? 0)
+  const newVerifyCredits = currentVerifyCredits + (transaction.credits_verify_added ?? 0)
 
   // Extract customer_id from multiple possible locations
-  const customerId = subscriptionData.customer_id || 
-                    (subscriptionData as any).event_data?.customer_id || 
-                    transaction.metadata?.event_data?.customer_id
+  const customerId = (subscriptionData as Record<string, unknown>).customer_id as string | undefined || 
+                    ((subscriptionData as Record<string, unknown>).event_data as Record<string, unknown> | undefined)?.customer_id as string | undefined || 
+                    ((transaction.metadata as Record<string, unknown> | undefined)?.event_data as Record<string, unknown> | undefined)?.customer_id as string | undefined
 
   // Extract customer portal URL from webhook data or fetch it
   const customerPortalUrl = customerId ? await getCustomerPortalUrl(customerId, subscriptionData) : null
@@ -510,7 +520,7 @@ async function handleSubscriptionEvent(supabase: any, event: LemonSqueezyWebhook
 }
 
 // Handle subscription cancellation/expiration
-async function handleSubscriptionCancellation(supabase: any, event: LemonSqueezyWebhookEvent, transaction: any) {
+async function handleSubscriptionCancellation(supabase: SupabaseClient, event: LemonSqueezyWebhookEvent, transaction: TransactionData) {
   const userId = event.data.attributes.custom_data?.user_id
   
   // Downgrade user to free plan
@@ -538,7 +548,7 @@ async function handleSubscriptionCancellation(supabase: any, event: LemonSqueezy
 }
 
 // Handle one-time order creation
-async function handleOrderCreated(supabase: any, event: LemonSqueezyWebhookEvent, transaction: any) {
+async function handleOrderCreated(supabase: SupabaseClient, event: LemonSqueezyWebhookEvent, transaction: TransactionData) {
   const userId = event.data.attributes.custom_data?.user_id
   const orderData = event.data.attributes
   
@@ -551,18 +561,18 @@ async function handleOrderCreated(supabase: any, event: LemonSqueezyWebhookEvent
 
   const currentFindCredits = profile?.credits_find || 0
   const currentVerifyCredits = profile?.credits_verify || 0
-  const newFindCredits = currentFindCredits + (transaction.credits_find_added || 0)
-  const newVerifyCredits = currentVerifyCredits + (transaction.credits_verify_added || 0)
+  const newFindCredits = currentFindCredits + (transaction.credits_find_added ?? 0)
+  const newVerifyCredits = currentVerifyCredits + (transaction.credits_verify_added ?? 0)
 
   // Extract customer_id from multiple possible locations
-  const customerId = orderData.customer_id || 
-                    (orderData as any).event_data?.customer_id || 
-                    transaction.metadata?.event_data?.customer_id
+  const customerId = (orderData as Record<string, unknown>).customer_id as string | undefined || 
+                    ((orderData as Record<string, unknown>).event_data as Record<string, unknown> | undefined)?.customer_id as string | undefined || 
+                    ((transaction.metadata as Record<string, unknown> | undefined)?.event_data as Record<string, unknown> | undefined)?.customer_id as string | undefined
 
   // Extract customer portal URL from webhook data or fetch it
   const customerPortalUrl = customerId ? await getCustomerPortalUrl(customerId, orderData) : null
 
-  let updateData: any = {
+  const updateData: Record<string, unknown> = {
     credits_find: newFindCredits,
     credits_verify: newVerifyCredits,
     lemonsqueezy_customer_id: customerId,
@@ -610,7 +620,7 @@ async function handleOrderCreated(supabase: any, event: LemonSqueezyWebhookEvent
       .from('credit_transactions')
       .insert({
         user_id: userId,
-        amount: transaction.credits_find_added + transaction.credits_verify_added,
+        amount: (transaction.credits_find_added ?? 0) + (transaction.credits_verify_added ?? 0),
         operation: 'purchase',
         meta: {
           transaction_id: transaction.id,
@@ -628,17 +638,17 @@ async function handleOrderCreated(supabase: any, event: LemonSqueezyWebhookEvent
     .update({ status: 'completed' })
     .eq('id', transaction.id)
 
-  console.log(`Order processed for user ${userId}: +${transaction.credits_find_added} find credits, +${transaction.credits_verify_added} verify credits`)
+  console.log(`Order processed for user ${userId}: +${transaction.credits_find_added ?? 0} find credits, +${transaction.credits_verify_added ?? 0} verify credits`)
 }
 
 // Handle subscription payment success
-async function handleSubscriptionPayment(supabase: any, event: LemonSqueezyWebhookEvent, transaction: any) {
+async function handleSubscriptionPayment(supabase: SupabaseClient, event: LemonSqueezyWebhookEvent, transaction: TransactionData) {
   // For recurring payments, we might want to add credits or extend plan
   await handleSubscriptionEvent(supabase, event, transaction)
 }
 
 // Handle payment failures
-async function handlePaymentFailure(supabase: any, event: LemonSqueezyWebhookEvent, transaction: any) {
+async function handlePaymentFailure(supabase: SupabaseClient, event: LemonSqueezyWebhookEvent, transaction: TransactionData) {
   const userId = event.data.attributes.custom_data?.user_id
   
   // Update transaction status to failed

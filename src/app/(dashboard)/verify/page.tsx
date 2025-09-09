@@ -24,9 +24,24 @@ interface VerifyRow {
   user_name?: string
 }
 
+interface CsvRow {
+  Email?: string
+  email?: string
+  [key: string]: unknown
+}
+
+interface EmailResult {
+  email: string
+  status: string
+  catch_all?: boolean
+  domain?: string
+  mx?: string
+  user_name?: string
+}
+
 export default function VerifyPage() {
   const [singleEmail, setSingleEmail] = useState('')
-  const [singleResult, setSingleResult] = useState<any>(null)
+  const [singleResult, setSingleResult] = useState<{ status: string; reason?: string; error?: string } | null>(null)
   const [isVerifyingSingle, setIsVerifyingSingle] = useState(false)
   
   const [rows, setRows] = useState<VerifyRow[]>([])
@@ -38,7 +53,7 @@ export default function VerifyPage() {
   // Background job tracking
   const [currentJob, setCurrentJob] = useState<BulkVerificationJob | null>(null)
   const [allJobs, setAllJobs] = useState<BulkVerificationJob[]>([])
-  const [isSubmittingJob, setIsSubmittingJob] = useState(false)
+  // const [isSubmittingJob, setIsSubmittingJob] = useState(false) // Currently unused
 
   // Poll job status every 3 seconds
   const pollJobStatus = async (jobId: string) => {
@@ -61,7 +76,7 @@ export default function VerifyPage() {
           if (job.emailsData && Array.isArray(job.emailsData)) {
             setRows(prevRows => {
               return prevRows.map(row => {
-                const emailResult = job.emailsData?.find((result: any) => result.email === row.email)
+                const emailResult = job.emailsData?.find((result: EmailResult) => result.email === row.email)
                 if (emailResult) {
                   return {
                     ...row,
@@ -148,7 +163,7 @@ export default function VerifyPage() {
 
     try {
       const result = await verifySingleEmail(singleEmail)
-      setSingleResult({ result })
+      setSingleResult({ status: result.status, reason: result.reason, error: result.error })
       
       if (result.status === 'valid') {
         toast.success('Email is valid!')
@@ -159,8 +174,9 @@ export default function VerifyPage() {
       } else if (result.status === 'error') {
         toast.error(result.error || 'Failed to verify email')
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to verify email')
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to verify email'
+      toast.error(errorMessage)
     } finally {
       setIsVerifyingSingle(false)
     }
@@ -176,9 +192,9 @@ export default function VerifyPage() {
       Papa.parse(file, {
         header: true,
         complete: (results) => {
-          const newRows: VerifyRow[] = results.data
-            .filter((row: any) => row['Email'] || row['email'])
-            .map((row: any, index: number) => ({
+          const newRows: VerifyRow[] = (results.data as CsvRow[])
+            .filter((row: CsvRow) => row['Email'] || row['email'])
+            .map((row: CsvRow, index: number) => ({
               id: index,
               email: row['Email'] || row['email'] || '',
               status: 'pending' as const,
@@ -202,9 +218,9 @@ export default function VerifyPage() {
           const worksheet = workbook.Sheets[sheetName]
           const jsonData = XLSX.utils.sheet_to_json(worksheet)
           
-          const newRows: VerifyRow[] = jsonData
-            .filter((row: any) => row['Email'] || row['email'])
-            .map((row: any, index: number) => ({
+          const newRows: VerifyRow[] = (jsonData as CsvRow[])
+            .filter((row: CsvRow) => row['Email'] || row['email'])
+            .map((row: CsvRow, index: number) => ({
               id: index,
               email: row['Email'] || row['email'] || '',
               status: 'pending' as const,
@@ -236,7 +252,7 @@ export default function VerifyPage() {
       return
     }
 
-    setIsSubmittingJob(true)
+    // setIsSubmittingJob(true) // Currently unused
 
     try {
       const emails = validRows.map(row => row.email)
@@ -263,10 +279,11 @@ export default function VerifyPage() {
       } else {
         toast.error(result.error || 'Failed to submit bulk verification job')
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to submit bulk verification job')
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to submit bulk verification job'
+      toast.error(errorMessage)
     } finally {
-      setIsSubmittingJob(false)
+      // setIsSubmittingJob(false) // Currently unused
     }
   }
 
