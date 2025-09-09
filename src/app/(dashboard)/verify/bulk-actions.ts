@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { getCurrentUser, checkCredits, isPlanExpired } from '@/lib/auth'
+import { getCurrentUser, isPlanExpired } from '@/lib/auth'
 import type { BulkVerificationJob } from './types'
 
 async function createSupabaseClient() {

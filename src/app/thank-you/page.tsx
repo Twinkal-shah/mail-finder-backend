@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,7 +8,7 @@ import { CheckCircle, Coins, CreditCard, ArrowRight, Home, Gift } from 'lucide-r
 import { toast } from 'sonner'
 import Link from 'next/link'
 
-export default function ThankYouPage() {
+function ThankYouContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isLoading, setIsLoading] = useState(true)
@@ -121,7 +121,7 @@ export default function ThankYouPage() {
             
             {/* What's Next Section */}
             <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <h3 className="font-semibold text-blue-900 mb-2">What's Next?</h3>
+              <h3 className="font-semibold text-blue-900 mb-2">What&apos;s Next?</h3>
               <ul className="text-sm text-blue-800 space-y-1">
                 <li>&bull; Your credits are now available in your account</li>
                 <li>&bull; Start finding and verifying email addresses</li>
@@ -170,5 +170,13 @@ export default function ThankYouPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function ThankYouPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ThankYouContent />
+    </Suspense>
   )
 }

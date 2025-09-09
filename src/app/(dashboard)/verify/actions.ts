@@ -6,7 +6,7 @@ import { createServerActionClient } from '@/lib/supabase'
 import { verifyEmail, type EmailVerifierRequest } from '@/lib/services/email-verifier'
 
 interface VerifyResult {
-  status: 'valid' | 'invalid' | 'risky' | 'unknown' | 'error'
+  status: 'pending' | 'processing' | 'valid' | 'invalid' | 'risky' | 'unknown' | 'error'
   reason?: string
   success?: boolean
   error?: string

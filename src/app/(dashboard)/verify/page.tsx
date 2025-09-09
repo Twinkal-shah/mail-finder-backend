@@ -17,7 +17,7 @@ import type { BulkVerificationJob } from './types'
 interface VerifyRow {
   id: number
   email: string
-  status: 'pending' | 'processing' | 'valid' | 'invalid' | 'risky' | 'error'
+  status: 'pending' | 'processing' | 'valid' | 'invalid' | 'risky' | 'error' | 'unknown'
   catch_all?: boolean
   domain?: string
   mx?: string
@@ -32,7 +32,7 @@ interface CsvRow {
 
 interface EmailResult {
   email: string
-  status: string
+  status: 'pending' | 'processing' | 'valid' | 'invalid' | 'risky' | 'error' | 'unknown'
   catch_all?: boolean
   domain?: string
   mx?: string
@@ -76,15 +76,15 @@ export default function VerifyPage() {
           if (job.emailsData && Array.isArray(job.emailsData)) {
             setRows(prevRows => {
               return prevRows.map(row => {
-                const emailResult = job.emailsData?.find((result: EmailResult) => result.email === row.email)
+                const emailResult = (job.emailsData as EmailResult[])?.find((result: EmailResult) => result.email === row.email)
                 if (emailResult) {
                   return {
                     ...row,
                     status: emailResult.status || 'pending',
-                    catch_all: emailResult.catch_all,
-                    domain: emailResult.domain,
-                    mx: emailResult.mx,
-                    user_name: emailResult.user_name
+                    catch_all: emailResult.catch_all as boolean | undefined,
+                    domain: emailResult.domain as string | undefined,
+                    mx: emailResult.mx as string | undefined,
+                    user_name: emailResult.user_name as string | undefined
                   }
                 }
                 return row
@@ -141,7 +141,7 @@ export default function VerifyPage() {
   // Load jobs on component mount
   useEffect(() => {
     loadUserJobs()
-  }, [])
+  }, [loadUserJobs])
 
   // Update progress when current job changes
   useEffect(() => {
@@ -301,7 +301,7 @@ export default function VerifyPage() {
       document.body.removeChild(a)
       window.URL.revokeObjectURL(url)
       toast.success('Results exported to CSV')
-    } catch (error) {
+    } catch {
       toast.error('Failed to export results')
     }
   }
@@ -366,23 +366,23 @@ export default function VerifyPage() {
           
           {singleResult && (
             <Card className={`border-2 ${
-              singleResult.result.status === 'valid' ? 'border-green-200 bg-green-50' :
-              singleResult.result.status === 'invalid' ? 'border-red-200 bg-red-50' :
-              singleResult.result.status === 'risky' ? 'border-yellow-200 bg-yellow-50' :
+              singleResult.status === 'valid' ? 'border-green-200 bg-green-50' :
+              singleResult.status === 'invalid' ? 'border-red-200 bg-red-50' :
+              singleResult.status === 'risky' ? 'border-yellow-200 bg-yellow-50' :
               'border-gray-200 bg-gray-50'
             }`}>
               <CardContent className="pt-6">
                 <div className="flex items-center gap-3">
-                  {singleResult.result.status === 'valid' && <CheckCircle className="h-5 w-5 text-green-600" />}
-                  {singleResult.result.status === 'invalid' && <AlertCircle className="h-5 w-5 text-red-600" />}
-                  {singleResult.result.status === 'risky' && <AlertCircle className="h-5 w-5 text-yellow-600" />}
+                  {singleResult.status === 'valid' && <CheckCircle className="h-5 w-5 text-green-600" />}
+                  {singleResult.status === 'invalid' && <AlertCircle className="h-5 w-5 text-red-600" />}
+                  {singleResult.status === 'risky' && <AlertCircle className="h-5 w-5 text-yellow-600" />}
                   <div>
                     <p className="font-medium">
-                      Status: <span className="capitalize">{singleResult.result.status === 'valid' ? 'Valid' : singleResult.result.status}</span>
+                      Status: <span className="capitalize">{singleResult.status === 'valid' ? 'Valid' : singleResult.status}</span>
                     </p>
-                    {singleResult.result.reason && (
+                    {singleResult.reason && (
                       <p className="text-sm text-gray-600">
-                        Reason: {singleResult.result.reason}
+                        Reason: {singleResult.reason}
                       </p>
                     )}
                   </div>

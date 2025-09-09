@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { createServerClient } from '@supabase/ssr'
 
@@ -17,7 +17,7 @@ function createServiceClient() {
 }
 
 // POST: Stop all running bulk verification jobs for the current user
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     // Get current user for authorization
     const user = await getCurrentUser()

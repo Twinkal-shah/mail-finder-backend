@@ -1,6 +1,6 @@
 'use server'
 
-import { checkCredits, deductCredits, getCurrentUser, isPlanExpired } from '@/lib/auth'
+import { deductCredits, getCurrentUser, isPlanExpired } from '@/lib/auth'
 import { createServerActionClient } from '@/lib/supabase'
 import { revalidatePath } from 'next/cache'
 import { findEmail as findEmailService, type EmailFinderRequest } from '@/lib/services/email-finder'

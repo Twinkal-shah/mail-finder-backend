@@ -6,7 +6,7 @@ import { getCurrentUser } from '@/lib/auth'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 
 // GET: Get all bulk verification jobs for the current user
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const user = await getCurrentUser()
     if (!user) {

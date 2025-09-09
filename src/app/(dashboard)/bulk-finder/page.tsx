@@ -205,7 +205,7 @@ export default function BulkFinderPage() {
       } else {
         toast.error(result.error || 'Failed to submit job')
       }
-    } catch (error) {
+    } catch {
       toast.error('An unexpected error occurred')
     } finally {
       setIsSubmitting(false)
@@ -224,7 +224,7 @@ export default function BulkFinderPage() {
       } else {
         toast.error(result.error || 'Failed to stop job')
       }
-    } catch (error) {
+    } catch {
       toast.error('An unexpected error occurred')
     }
   }

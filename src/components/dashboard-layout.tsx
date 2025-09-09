@@ -79,7 +79,7 @@ export function DashboardLayout({ children, userProfile }: DashboardLayoutProps)
           }
           setCurrentProfile(newUserProfile)
         }
-      } catch (error) {
+      } catch {
         console.log('Failed to refresh profile data')
       }
     }

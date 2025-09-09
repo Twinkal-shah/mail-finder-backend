@@ -132,7 +132,7 @@ export default function CreditsPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [router])
 
   useEffect(() => {
     loadData()

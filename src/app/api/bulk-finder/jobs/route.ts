@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { findEmail } from '@/lib/services/email-finder'
-import { deductCredits } from '@/lib/auth'
 import type { BulkFindRequest } from '@/app/(dashboard)/bulk-finder/types'
 
 async function createSupabaseClient() {
