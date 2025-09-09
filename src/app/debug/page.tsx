@@ -2,14 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
-import type { User } from '@supabase/supabase-js'
-import type { Database } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function DebugPage() {
-  const [user, setUser] = useState<User | null>(null)
-  const [profile, setProfile] = useState<Database['public']['Tables']['profiles']['Row'] | null>(null)
+  const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [supabase] = useState(() => createClient())

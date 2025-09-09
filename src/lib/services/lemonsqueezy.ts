@@ -562,7 +562,7 @@ async function handleOrderCreated(supabase: any, event: LemonSqueezyWebhookEvent
   // Extract customer portal URL from webhook data or fetch it
   const customerPortalUrl = customerId ? await getCustomerPortalUrl(customerId, orderData) : null
 
-  const updateData: Record<string, unknown> = {
+  let updateData: any = {
     credits_find: newFindCredits,
     credits_verify: newVerifyCredits,
     lemonsqueezy_customer_id: customerId,

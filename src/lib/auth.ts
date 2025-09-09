@@ -298,7 +298,7 @@ export async function deductCredits(
     }
     
     // Deduct credits based on operation type
-    let updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
+    let updateData: any = { updated_at: new Date().toISOString() }
     
     if (operation === 'email_verify') {
       if (currentVerifyCredits >= required) {
