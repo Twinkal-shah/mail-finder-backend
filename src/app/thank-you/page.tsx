@@ -121,7 +121,7 @@ export default function ThankYouPage() {
             
             {/* What's Next Section */}
             <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <h3 className="font-semibold text-blue-900 mb-2">What's Next?</h3>
+              <h3 className="font-semibold text-blue-900 mb-2">What&apos;s Next?</h3>
               <ul className="text-sm text-blue-800 space-y-1">
                 <li>• Your credits are now available in your account</li>
                 <li>• Start finding and verifying email addresses</li>
