@@ -2,60 +2,53 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
+import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { User } from '@supabase/supabase-js'
 
 export default function DebugPage() {
-  const [user, setUser] = useState<User | null>(null)
+  const { user, loading: authLoading, error: authError, refreshAuth } = useAuth()
   const [profile, setProfile] = useState<Record<string, unknown> | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [supabase] = useState(() => createClient())
 
-  const checkUser = useCallback(async () => {
+  const loadProfile = useCallback(async () => {
+    if (!user) {
+      setProfile(null)
+      return
+    }
+
     try {
       setLoading(true)
       setError(null)
       
-      // Check current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      // Get profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
       
-      if (userError) {
-        setError(`User error: ${userError.message}`)
-        return
-      }
-      
-      setUser(user)
-      
-      if (user) {
-        // Get profile
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single()
-        
-        if (profileError) {
-          setError(`Profile error: ${profileError.message}`)
-        } else {
-          setProfile(profile)
-        }
+      if (profileError) {
+        setError(`Profile error: ${profileError.message}`)
+      } else {
+        setProfile(profile)
       }
     } catch (err) {
       setError(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }, [user, supabase])
 
   useEffect(() => {
-    checkUser()
-  }, [checkUser])
+    loadProfile()
+  }, [loadProfile])
 
   const signOut = async () => {
     await supabase.auth.signOut()
-    setUser(null)
     setProfile(null)
   }
 
@@ -79,7 +72,8 @@ export default function DebugPage() {
         setError(`Sign up error: ${error.message}`)
       } else {
         console.log('Test user created:', data)
-        await checkUser()
+        await refreshAuth()
+        await loadProfile()
       }
     } catch (err) {
       setError(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`)
@@ -102,7 +96,8 @@ export default function DebugPage() {
         setError(`Sign in error: ${error.message}`)
       } else {
         console.log('Test user signed in:', data)
-        await checkUser()
+        await refreshAuth()
+        await loadProfile()
       }
     } catch (err) {
       setError(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`)
@@ -117,12 +112,52 @@ export default function DebugPage() {
       
       <Card>
         <CardHeader>
-          <CardTitle>Current User Status</CardTitle>
+          <CardTitle>Authentication Status</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {authLoading && <p>Loading authentication...</p>}
+          {authError && <p className="text-red-500">Auth Error: {authError}</p>}
+          {error && <p className="text-red-500">Profile Error: {error}</p>}
+          {user ? (
+            <div>
+              <p className="text-green-500">✓ Authenticated</p>
+              <p>User ID: {user.id}</p>
+              <p>Email: {user.email}</p>
+            </div>
+          ) : (
+            <p className="text-red-500">✗ Not authenticated</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>User Profile</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading && <p>Loading profile...</p>}
+          {profile ? (
+            <div className="space-y-2">
+              {Object.entries(profile).map(([key, value]) => (
+                <div key={key} className="flex justify-between">
+                  <span className="font-medium">{key}:</span>
+                  <span>{String(value)}</span>
+                </div>
+              ))}
+            </div>
+          ) : user ? (
+            <p>No profile data found</p>
+          ) : (
+            <p>Please authenticate to view profile</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Debug Data</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {loading && <p>Loading...</p>}
-          {error && <p className="text-red-500">Error: {error}</p>}
-          
           <div>
             <h3 className="font-semibold">User:</h3>
             <pre className="bg-gray-100 p-2 rounded text-sm overflow-auto">
@@ -138,7 +173,7 @@ export default function DebugPage() {
           </div>
           
           <div className="flex gap-2 flex-wrap">
-            <Button onClick={checkUser} disabled={loading}>
+            <Button onClick={() => { refreshAuth(); loadProfile(); }} disabled={loading || authLoading}>
               Refresh
             </Button>
             <Button onClick={createTestUser} disabled={loading}>

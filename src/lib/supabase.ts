@@ -5,9 +5,73 @@ import { NextRequest, NextResponse } from 'next/server'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+// Rate limiting for token refresh
+let lastTokenRefresh = 0
+const TOKEN_REFRESH_COOLDOWN = 5000 // 5 seconds
+
 // Client-side Supabase client (for use in client components)
 export function createClient() {
-  return createBrowserClient(supabaseUrl, supabaseAnonKey)
+  return createBrowserClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      // Reduce automatic token refresh frequency
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+      // Add custom token refresh logic with rate limiting
+      flowType: 'pkce'
+    },
+    global: {
+      // Add custom fetch with retry logic and rate limiting
+      fetch: async (url, options = {}) => {
+        const urlString = typeof url === 'string' ? url : url.toString()
+        const isTokenRefresh = urlString.includes('/auth/v1/token')
+        
+        if (isTokenRefresh) {
+          const now = Date.now()
+          if (now - lastTokenRefresh < TOKEN_REFRESH_COOLDOWN) {
+            console.log('Token refresh rate limited, skipping request')
+            throw new Error('Rate limited: Token refresh too frequent')
+          }
+          lastTokenRefresh = now
+        }
+        
+        // Implement exponential backoff for failed requests
+        let retries = 0
+        const maxRetries = 3
+        
+        while (retries < maxRetries) {
+          try {
+            const response = await fetch(url, options)
+            
+            // If we get a 429 (rate limit), wait before retrying
+            if (response.status === 429) {
+              const retryAfter = response.headers.get('retry-after')
+              const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : Math.pow(2, retries) * 1000
+              
+              console.log(`Rate limited, waiting ${waitTime}ms before retry ${retries + 1}/${maxRetries}`)
+              await new Promise(resolve => setTimeout(resolve, waitTime))
+              retries++
+              continue
+            }
+            
+            return response
+          } catch (error) {
+            retries++
+            if (retries >= maxRetries) {
+              throw error
+            }
+            
+            // Wait with exponential backoff
+            const waitTime = Math.pow(2, retries) * 1000
+            console.log(`Request failed, retrying in ${waitTime}ms (${retries}/${maxRetries})`)
+            await new Promise(resolve => setTimeout(resolve, waitTime))
+          }
+        }
+        
+        throw new Error('Max retries exceeded')
+      }
+    }
+  })
 }
 
 // Server-side Supabase client for server components
