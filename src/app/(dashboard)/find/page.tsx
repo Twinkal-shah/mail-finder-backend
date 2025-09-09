@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
+
 import { toast } from 'sonner'
 import { Search, Mail, CheckCircle, Clock } from 'lucide-react'
 import { findEmail as findEmailAction } from './actions'
@@ -66,7 +66,7 @@ export default function FindPage() {
       } else {
         toast.error(response.error || 'Failed to find email')
       }
-    } catch (error) {
+    } catch {
       toast.error('An unexpected error occurred')
     } finally {
       setIsLoading(false)
@@ -78,7 +78,7 @@ export default function FindPage() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Find Email</h1>
         <p className="text-gray-600 mt-2">
-          Find professional email addresses using a person's name and company domain.
+          Find professional email addresses using a person&apos;s name and company domain.
         </p>
       </div>
 
@@ -91,7 +91,7 @@ export default function FindPage() {
               Email Finder
             </CardTitle>
             <CardDescription>
-              Enter the person's details to find their email address.
+              Enter the person&apos;s details to find their email address.
             </CardDescription>
           </CardHeader>
           <CardContent>

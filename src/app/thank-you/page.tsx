@@ -123,10 +123,10 @@ export default function ThankYouPage() {
             <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
               <h3 className="font-semibold text-blue-900 mb-2">What's Next?</h3>
               <ul className="text-sm text-blue-800 space-y-1">
-                <li>• Your credits are now available in your account</li>
-                <li>• Start finding and verifying email addresses</li>
-                <li>• Check your credit balance anytime in the Credits page</li>
-                <li>• A receipt has been sent to your email address</li>
+                <li>&bull; Your credits are now available in your account</li>
+                <li>&bull; Start finding and verifying email addresses</li>
+                <li>&bull; Check your credit balance anytime in the Credits page</li>
+                <li>&bull; A receipt has been sent to your email address</li>
               </ul>
             </div>
           </CardContent>

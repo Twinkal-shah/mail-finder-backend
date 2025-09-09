@@ -246,7 +246,8 @@ export async function createLemonSqueezyPortal(
 async function getCustomerPortalUrl(customerId: string, eventData: Record<string, unknown>): Promise<string | null> {
   try {
     // First try to extract from webhook data
-    const portalUrl = (eventData as any).urls?.customer_portal
+    const urls = (eventData as Record<string, unknown>).urls as Record<string, unknown> | undefined
+    const portalUrl = urls?.customer_portal as string | undefined
     if (portalUrl) {
       console.log('Found customer portal URL in webhook data:', portalUrl)
       return portalUrl
@@ -615,7 +616,7 @@ async function handleOrderCreated(supabase: SupabaseClient, event: LemonSqueezyW
   }
 
   // Log credit transaction in the old table for compatibility
-  if (transaction.credits_find_added > 0 || transaction.credits_verify_added > 0) {
+  if ((transaction.credits_find_added ?? 0) > 0 || (transaction.credits_verify_added ?? 0) > 0) {
     await supabase
       .from('credit_transactions')
       .insert({

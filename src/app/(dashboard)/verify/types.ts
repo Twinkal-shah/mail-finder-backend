@@ -1,3 +1,10 @@
+export interface EmailData {
+  email: string
+  status?: 'pending' | 'processing' | 'valid' | 'invalid' | 'unknown' | 'error' | 'risky'
+  confidence?: number
+  [key: string]: unknown
+}
+
 export interface BulkVerificationJob {
   jobId: string
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'paused'
@@ -5,7 +12,7 @@ export interface BulkVerificationJob {
   processedEmails?: number
   successfulVerifications?: number
   failedVerifications?: number
-  emailsData?: any[]
+  emailsData?: EmailData[]
   errorMessage?: string
   createdAt?: string
   updatedAt?: string

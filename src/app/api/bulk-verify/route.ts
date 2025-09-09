@@ -3,6 +3,8 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { verifyEmail } from '@/lib/services/email-verifier'
 import { checkCredits, deductCredits, getCurrentUser, isPlanExpired } from '@/lib/auth'
+import { SupabaseClient } from '@supabase/supabase-js'
+import { EmailData } from '@/app/(dashboard)/verify/types'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -227,8 +229,8 @@ async function processJob(jobId: string) {
       .update({ status: 'processing' })
       .eq('id', jobId)
 
-    const emailsData = job.emails_data as any[]
-    let currentIndex = job.current_index || 0
+    const emailsData = job.emails_data as EmailData[]
+    const currentIndex = job.current_index || 0
     let processedEmails = job.processed_emails || 0
     let successfulVerifications = job.successful_verifications || 0
     let failedVerifications = job.failed_verifications || 0
@@ -347,7 +349,7 @@ async function processJob(jobId: string) {
 }
 
 // Helper function to update job progress
-async function updateJobProgress(supabase: any, jobId: string, updates: any) {
+async function updateJobProgress(supabase: SupabaseClient, jobId: string, updates: Record<string, unknown>) {
   await supabase
     .from('bulk_verification_jobs')
     .update(updates)

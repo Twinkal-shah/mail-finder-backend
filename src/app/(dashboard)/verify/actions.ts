@@ -158,7 +158,6 @@ export async function processBulkVerify(emails: string[]): Promise<VerifyResult[
     }
     
     const results: VerifyResult[] = []
-    let successfulVerifications = 0
     
     // Process each email
     for (const email of emails) {
@@ -180,7 +179,7 @@ export async function processBulkVerify(emails: string[]): Promise<VerifyResult[
       
       // Count successful verifications (non-error status)
       if (result.status !== 'error') {
-        // successfulVerifications++ // Currently not used
+        // Verification successful - no action needed
       }
       
       // Deduct 1 credit for each verification attempt (including errors)

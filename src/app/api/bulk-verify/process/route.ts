@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { verifyEmail } from '@/lib/services/email-verifier'
-import { deductCredits } from '@/lib/auth'
+import { SupabaseClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -153,7 +153,7 @@ async function processJob(jobId: string) {
          // User should be charged for every verification attempt made
          try {
            // Deduct from verify credits first, then find credits if needed
-           let updateData: any = { updated_at: new Date().toISOString() }
+           const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
            
            if (currentVerifyCredits >= 1) {
              updateData.credits_verify = currentVerifyCredits - 1
@@ -256,7 +256,7 @@ async function processJob(jobId: string) {
   }
 }
 
-async function updateJobProgress(supabase: any, jobId: string, updates: any) {
+async function updateJobProgress(supabase: SupabaseClient, jobId: string, updates: Record<string, unknown>) {
   const { error } = await supabase
     .from('bulk_verification_jobs')
     .update(updates)

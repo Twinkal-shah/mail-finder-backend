@@ -4,11 +4,20 @@ import { getCurrentUser } from '@/lib/auth'
 import { getUserCredits } from '@/lib/profile-server'
 import { getCreditTransactions } from '@/lib/auth'
 import { createServerActionClient } from '@/lib/supabase'
-import { redirect } from 'next/navigation'
+import { LemonSqueezyWebhookEvent } from '@/lib/services/lemonsqueezy'
 
 interface CreditUsage {
   date: string
   credits_used: number
+}
+
+interface CreditTransaction {
+  created_at: string
+  amount: number
+}
+
+interface UserMetadata {
+  full_name?: string
 }
 
 // Get user profile with credits breakdown
@@ -30,7 +39,7 @@ export async function getUserProfileWithCredits() {
   return {
     id: user.id,
     email: user.email || '',
-    full_name: profileData?.full_name || (user as any).user_metadata?.full_name || null,
+    full_name: profileData?.full_name || (user as { user_metadata?: UserMetadata }).user_metadata?.full_name || null,
     plan: profileData?.plan || 'free',
     credits_find: creditsData.find,
     credits_verify: creditsData.verify,
@@ -67,7 +76,7 @@ export async function getCreditUsageHistory(): Promise<CreditUsage[]> {
         // Group transactions by date and sum the usage (convert negative amounts to positive)
         const usageByDate: { [key: string]: number } = {}
         
-        creditTransactions.forEach((transaction: any) => {
+        creditTransactions.forEach((transaction: CreditTransaction) => {
           const date = new Date(transaction.created_at).toISOString().split('T')[0]
           const creditsUsed = Math.abs(transaction.amount) // Convert negative to positive
           usageByDate[date] = (usageByDate[date] || 0) + creditsUsed
@@ -281,7 +290,7 @@ export async function getTransactionHistory(limit: number = 10) {
 }
 
 // LemonSqueezy webhook handler
-export async function handleLemonSqueezyWebhook(event: any) {
+export async function handleLemonSqueezyWebhook(event: LemonSqueezyWebhookEvent) {
   try {
     const { handleLemonSqueezyWebhook: handleWebhook } = await import('@/lib/services/lemonsqueezy')
     await handleWebhook(event)

@@ -20,10 +20,10 @@ export async function createServerComponentClient() {
       get(name: string) {
         return cookieStore.get(name)?.value
       },
-      set(_name: string, _value: string, _options: CookieOptions) {
+      set() {
         // Read-only in server components
       },
-      remove(_name: string, _options: CookieOptions) {
+      remove() {
         // Read-only in server components
       },
     },
@@ -70,7 +70,7 @@ export function createMiddlewareClient(request: NextRequest) {
       get(name: string) {
         return request.cookies.get(name)?.value
       },
-      set(name: string, value: string, options: any) {
+      set(name: string, value: string, options: CookieOptions) {
         response.cookies.set({
           name,
           value,
@@ -79,7 +79,7 @@ export function createMiddlewareClient(request: NextRequest) {
           sameSite: 'lax',
         })
       },
-      remove(name: string, options: any) {
+      remove(name: string, options: CookieOptions) {
         response.cookies.set({
           name,
           value: '',

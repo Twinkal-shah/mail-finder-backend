@@ -1,22 +1,19 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { User } from '@supabase/supabase-js'
 
 export default function DebugPage() {
-  const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<Record<string, unknown> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [supabase] = useState(() => createClient())
 
-  useEffect(() => {
-    checkUser()
-  }, [])
-
-  const checkUser = async () => {
+  const checkUser = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -46,11 +43,15 @@ export default function DebugPage() {
         }
       }
     } catch (err) {
-      setError(`Unexpected error: ${err}`)
+      setError(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    checkUser()
+  }, [checkUser])
 
   const signOut = async () => {
     await supabase.auth.signOut()
@@ -81,7 +82,7 @@ export default function DebugPage() {
         await checkUser()
       }
     } catch (err) {
-      setError(`Unexpected error: ${err}`)
+      setError(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setLoading(false)
     }
@@ -104,7 +105,7 @@ export default function DebugPage() {
         await checkUser()
       }
     } catch (err) {
-      setError(`Unexpected error: ${err}`)
+      setError(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setLoading(false)
     }
