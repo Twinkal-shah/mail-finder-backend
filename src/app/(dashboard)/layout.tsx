@@ -3,6 +3,9 @@ import { getProfileData } from '@/lib/profile'
 import { getCurrentUser } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 
+// Force dynamic rendering for all dashboard pages
+export const dynamic = 'force-dynamic'
+
 export default async function Layout({
   children,
 }: {

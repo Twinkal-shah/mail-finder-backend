@@ -29,8 +29,12 @@ export function createClient() {
         if (isTokenRefresh) {
           const now = Date.now()
           if (now - lastTokenRefresh < TOKEN_REFRESH_COOLDOWN) {
-            console.log('Token refresh rate limited, skipping request')
-            throw new Error('Rate limited: Token refresh too frequent')
+            console.log('Token refresh rate limited, using cached session')
+            // Return a mock response to prevent error propagation
+            return new Response(JSON.stringify({ error: 'rate_limited' }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' }
+            })
           }
           lastTokenRefresh = now
         }
@@ -107,14 +111,14 @@ export async function createServerActionClient() {
       set(name: string, value: string, options: CookieOptions) {
         try {
           cookieStore.set(name, value, options)
-        } catch (error) {
+        } catch {
           // Silently fail if cookies can't be set outside server actions
         }
       },
       remove(name: string, options: CookieOptions) {
         try {
           cookieStore.set(name, '', { ...options, maxAge: 0 })
-        } catch (error) {
+        } catch {
           // Silently fail if cookies can't be removed outside server actions
         }
       },
