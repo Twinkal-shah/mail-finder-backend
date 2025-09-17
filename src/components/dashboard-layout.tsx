@@ -21,6 +21,7 @@ import {
   LogOut,
   Menu,
   X,
+  Key,
 } from 'lucide-react'
 import { getProfileDataClient } from '@/lib/profile'
 
@@ -38,22 +39,31 @@ interface DashboardLayoutProps {
   }
 }
 
-const navigation = [
-  {
-    name: 'EMAIL TOOLS',
-    items: [
-      { name: 'Find', href: '/find', icon: Search },
-      { name: 'Bulk finder', href: '/bulk-finder', icon: Users },
-      { name: 'Verify', href: '/verify', icon: CheckCircle },
-    ],
-  },
-  {
-    name: 'ACCOUNT',
-    items: [
-      { name: 'Credits & Billing', href: '/credits', icon: CreditCard },
-    ],
-  },
-]
+const getNavigation = (userPlan: string) => {
+  const baseNavigation = [
+    {
+      name: 'EMAIL TOOLS',
+      items: [
+        { name: 'Find', href: '/find', icon: Search },
+        { name: 'Bulk finder', href: '/bulk-finder', icon: Users },
+        { name: 'Verify', href: '/verify', icon: CheckCircle },
+      ],
+    },
+    {
+      name: 'ACCOUNT',
+      items: [
+        { name: 'Credits & Billing', href: '/credits', icon: CreditCard },
+      ],
+    },
+  ]
+
+  // Add API page for agency or lifetime plan users
+  if (userPlan === 'agency' || userPlan === 'lifetime') {
+    baseNavigation[1].items.push({ name: 'API', href: '/api', icon: Key })
+  }
+
+  return baseNavigation
+}
 
 export function DashboardLayout({ children, userProfile }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -128,7 +138,7 @@ export function DashboardLayout({ children, userProfile }: DashboardLayoutProps)
 
           {/* Navigation */}
           <nav className="flex-1 px-4 py-6 space-y-8">
-            {navigation.map((section) => (
+            {getNavigation(currentProfile.plan).map((section) => (
               <div key={section.name}>
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
                   {section.name}
