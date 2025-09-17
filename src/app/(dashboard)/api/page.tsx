@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Copy, Eye, EyeOff, Key, Plus, Trash2, AlertCircle, Code, BookOpen } from 'lucide-react'
+import { Copy, Eye, EyeOff, Key, Plus, Trash2, AlertCircle, BookOpen } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase'
 // Removed getCurrentUser import - using client-side auth instead
@@ -39,11 +39,7 @@ export default function ApiPage() {
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set())
   const supabase = createClient()
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       // Get current user from client-side Supabase
       const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -102,7 +98,11 @@ export default function ApiPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const createApiKey = async () => {
     if (!newKeyName.trim()) {
@@ -308,7 +308,7 @@ export default function ApiPage() {
                 <div className="space-y-2">
                   <p className="font-medium">Your new API key has been created!</p>
                   <p className="text-sm text-gray-600">
-                    Please copy and store this key securely. You won't be able to see it again.
+                    Please copy and store this key securely. You won&apos;t be able to see it again.
                   </p>
                   <div className="flex items-center gap-2 p-2 bg-gray-100 rounded font-mono text-sm">
                     <code className="flex-1">{newKeyValue}</code>
@@ -325,7 +325,7 @@ export default function ApiPage() {
                     variant="outline"
                     onClick={() => setShowNewKey(false)}
                   >
-                    I've saved my key
+                    I&apos;ve saved my key
                   </Button>
                 </div>
               </AlertDescription>

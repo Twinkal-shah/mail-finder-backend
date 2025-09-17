@@ -154,7 +154,6 @@ export async function deductApiCredits(
 ): Promise<boolean> {
   try {
     const supabase = createServiceClient()
-    const creditField = creditType === 'find' ? 'credits_find' : 'credits_verify'
     
     const { error } = await supabase.rpc('deduct_credits', {
       user_id: userId,
@@ -187,7 +186,7 @@ export function createApiErrorResponse(message: string, status: number = 400) {
   )
 }
 
-export function createApiSuccessResponse(data: any, status: number = 200) {
+export function createApiSuccessResponse(data: unknown, status: number = 200) {
   return Response.json(
     {
       success: true,
