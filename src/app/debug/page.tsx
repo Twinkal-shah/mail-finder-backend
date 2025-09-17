@@ -5,7 +5,6 @@ import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { User } from '@supabase/supabase-js'
 
 export default function DebugPage() {
   const { user, loading: authLoading, error: authError, refreshAuth } = useAuth()

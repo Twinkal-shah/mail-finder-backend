@@ -49,20 +49,7 @@ interface CreditTransaction {
   created_at: string
 }
 
-interface UserProfile {
-  id: string
-  full_name: string | null
-  email: string
-  plan: string
-  credits_find: number
-  credits_verify: number
-  total_credits: number
-}
-
-interface CreditUsage {
-  date: string
-  credits_used: number
-}
+// Removed unused interfaces - UserProfile and CreditUsage are now imported from hooks
 
 const PLANS = {
   free: {
@@ -105,7 +92,51 @@ function CreditsPageComponent() {
   const router = useRouter()
   
   // Use React Query for data fetching with caching
-  const { profile, transactions, creditUsage, isLoading, isError, error, refetch } = useCreditsData()
+  const { profile, transactions, creditUsage, isLoading, isError, error } = useCreditsData()
+  
+  // Memoize chart data to prevent unnecessary recalculations
+  const chartData = useMemo(() => ({
+    labels: creditUsage.map(item => {
+      const date = new Date(item.date)
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    }),
+    datasets: [
+      {
+        label: 'Credits Used',
+        data: creditUsage.map(item => item.credits_used),
+        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        tension: 0.1,
+        fill: true
+      }
+    ]
+  }), [creditUsage])
+
+  // Memoize chart options to prevent unnecessary recalculations
+  const chartOptions = useMemo(() => ({
+    responsive: true,
+    plugins: {
+      legend: {
+        display: false
+      },
+      title: {
+        display: false
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        grid: {
+          color: 'rgba(0, 0, 0, 0.1)'
+        }
+      },
+      x: {
+        grid: {
+          color: 'rgba(0, 0, 0, 0.1)'
+        }
+      }
+    }
+  }), [])
   
   // Handle profile not found
   if (!isLoading && !profile && !isError) {
@@ -330,50 +361,6 @@ function CreditsPageComponent() {
   // For free plans, assume they are not expired (plan expiry logic removed)
   const daysRemaining = profile?.plan === 'free' ? 3 : 0
   const isExpired = false
-
-  // Memoize chart data to prevent unnecessary recalculations
-  const chartData = useMemo(() => ({
-    labels: creditUsage.map(item => {
-      const date = new Date(item.date)
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    }),
-    datasets: [
-      {
-        label: 'Credits Used',
-        data: creditUsage.map(item => item.credits_used),
-        borderColor: 'rgb(59, 130, 246)',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        tension: 0.1,
-        fill: true
-      }
-    ]
-  }), [creditUsage])
-
-  // Memoize chart options to prevent unnecessary recalculations
-  const chartOptions = useMemo(() => ({
-    responsive: true,
-    plugins: {
-      legend: {
-        display: false
-      },
-      title: {
-        display: false
-      }
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        grid: {
-          color: 'rgba(0, 0, 0, 0.1)'
-        }
-      },
-      x: {
-        grid: {
-          color: 'rgba(0, 0, 0, 0.1)'
-        }
-      }
-    }
-  }), [])
 
   if (isLoading) {
     return (

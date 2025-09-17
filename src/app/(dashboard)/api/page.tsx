@@ -98,7 +98,7 @@ export default function ApiPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [supabase])
 
   useEffect(() => {
     loadData()
