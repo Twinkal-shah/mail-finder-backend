@@ -71,8 +71,6 @@ export async function getCreditUsageHistory(): Promise<CreditUsage[]> {
         .order('created_at', { ascending: true })
 
       if (!error && creditTransactions) {
-        console.log(`Found ${creditTransactions.length} credit transactions for user ${user.id}`)
-        
         // Group transactions by date and sum the usage (convert negative amounts to positive)
         const usageByDate: { [key: string]: number } = {}
         
@@ -96,7 +94,6 @@ export async function getCreditUsageHistory(): Promise<CreditUsage[]> {
           currentDate.setDate(currentDate.getDate() + 1)
         }
 
-        console.log('Returning real credit usage data from database')
         return result
       } else if (error) {
         console.error('Error querying credit_transactions:', error)
@@ -144,9 +141,9 @@ export async function createLemonSqueezyCheckout(planData: {
   
   // Validate plan data
   const validPlans = {
-    'Pro': { price: 49, period: 'month', findCredits: 50000, verifyCredits: 50000 },
-    'Agency': { price: 99, period: 'month', findCredits: 150000, verifyCredits: 150000 },
-    'Lifetime': { price: 249, period: 'lifetime', findCredits: 500000, verifyCredits: 500000 }
+    'Pro': { price: 49, period: 'month', findCredits: 5000, verifyCredits: 5000 },
+    'Agency': { price: 99, period: 'month', findCredits: 50000, verifyCredits: 50000 },
+    'Lifetime': { price: 249, period: 'lifetime', findCredits: 150000, verifyCredits: 150000 }
   }
   
   const validPlan = validPlans[planData.name as keyof typeof validPlans]
@@ -169,18 +166,17 @@ export async function createLemonSqueezyCheckout(planData: {
       throw new Error('Invalid plan selected')
     }
     
-    const result = await createCheckout(
-      {
-        productId: process.env.LEMONSQUEEZY_PRODUCT_ID || 'product-id',
-        variantId,
-        customData: {
-          plan_name: planData.name,
-          find_credits: planData.findCredits,
-          verify_credits: planData.verifyCredits,
-        },
+    const checkoutData = {
+      productId: process.env.LEMONSQUEEZY_PRODUCT_ID || 'product-id',
+      variantId,
+      customData: {
+        plan_name: planData.name,
+        find_credits: planData.findCredits,
+        verify_credits: planData.verifyCredits,
       },
-      user.id
-    )
+    }
+    
+    const result = await createCheckout(checkoutData, user.id)
     
     return { url: result.url }
   } catch (error) {

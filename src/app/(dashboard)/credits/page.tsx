@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useMemo, memo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { Coins, CreditCard, ExternalLink, History, TrendingUp, Calendar, CheckCircle, Plus } from 'lucide-react'
-import { getTransactionHistory, createLemonSqueezyCheckout, createCustomCreditCheckout, createLemonSqueezyPortal, getUserProfileWithCredits, getCreditUsageHistory } from './actions'
+import { createLemonSqueezyCheckout, createCustomCreditCheckout, createLemonSqueezyPortal } from './actions'
+import { useCreditsData } from '@/hooks/useCreditsData'
 import { Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -98,56 +99,26 @@ const PLANS = {
   }
 }
 
-export default function CreditsPage() {
-  const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [transactions, setTransactions] = useState<CreditTransaction[]>([])
-  const [creditUsage, setCreditUsage] = useState<CreditUsage[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+function CreditsPageComponent() {
   const [loadingStates, setLoadingStates] = useState<{[key: string]: boolean}>({})
   const [isCreatingPortal, setIsCreatingPortal] = useState(false)
   const router = useRouter()
-
-  const loadData = useCallback(async () => {
-    try {
-      setIsLoading(true)
-      const [profileData, transactionsData, usageData] = await Promise.all([
-        getUserProfileWithCredits(),
-        getTransactionHistory(),
-        getCreditUsageHistory()
-      ])
-      
-      // If profile data is null, redirect to profile initialization
-      if (!profileData) {
-        toast.error('Profile not found. Redirecting to profile setup...')
-        router.push('/init-profile')
-        return
-      }
-      
-      setProfile(profileData)
-      setTransactions(transactionsData)
-      setCreditUsage(usageData || [])
-    } catch (error) {
-      console.error('Error loading data:', error)
-      toast.error('Failed to load data')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [router])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
-
-  // Listen for focus events to reload data when user returns from payment
-  useEffect(() => {
-    const handleFocus = () => {
-      // Reload data when window regains focus (user returns from payment)
-      loadData()
-    }
-
-    window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
-  }, [loadData])
+  
+  // Use React Query for data fetching with caching
+  const { profile, transactions, creditUsage, isLoading, isError, error, refetch } = useCreditsData()
+  
+  // Handle profile not found
+  if (!isLoading && !profile && !isError) {
+    toast.error('Profile not found. Redirecting to profile setup...')
+    router.push('/init-profile')
+    return null
+  }
+  
+  // Handle errors
+  if (isError) {
+    console.error('Error loading data:', error)
+    toast.error('Failed to load data')
+  }
 
   const handleSubscribe = async (plan: { name: string; price: number; period: string; findCredits: number; verifyCredits: number }) => {
     const loadingKey = `plan-${plan.name}`
@@ -164,6 +135,8 @@ export default function CreditsPage() {
       if (result.url) {
         window.open(result.url, '_blank')
         toast.success(`Redirecting to ${plan.name} plan checkout...`)
+      } else {
+        toast.error('No checkout URL received')
       }
     } catch (error) {
       console.error('Error creating subscription checkout:', error)
@@ -358,8 +331,8 @@ export default function CreditsPage() {
   const daysRemaining = profile?.plan === 'free' ? 3 : 0
   const isExpired = false
 
-  // Prepare chart data
-  const chartData = {
+  // Memoize chart data to prevent unnecessary recalculations
+  const chartData = useMemo(() => ({
     labels: creditUsage.map(item => {
       const date = new Date(item.date)
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -374,9 +347,10 @@ export default function CreditsPage() {
         fill: true
       }
     ]
-  }
+  }), [creditUsage])
 
-  const chartOptions = {
+  // Memoize chart options to prevent unnecessary recalculations
+  const chartOptions = useMemo(() => ({
     responsive: true,
     plugins: {
       legend: {
@@ -399,15 +373,149 @@ export default function CreditsPage() {
         }
       }
     }
-  }
+  }), [])
 
   if (isLoading) {
     return (
       <div className="max-w-4xl mx-auto space-y-8">
+        {/* Header skeleton */}
         <div className="animate-pulse">
           <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
           <div className="h-4 bg-gray-200 rounded w-2/3"></div>
         </div>
+
+        {/* Current Balance skeleton */}
+        <Card>
+          <CardHeader>
+            <div className="animate-pulse">
+              <div className="h-6 bg-gray-200 rounded w-1/4 mb-2"></div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="animate-pulse flex items-center justify-between">
+              <div>
+                <div className="h-10 bg-gray-200 rounded w-20 mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded w-32 mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-24 mb-1"></div>
+                <div className="h-3 bg-gray-200 rounded w-28"></div>
+              </div>
+              <div className="text-right">
+                <div className="h-5 bg-gray-200 rounded w-20 mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded w-24"></div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Two column cards skeleton */}
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Current Plan skeleton */}
+          <Card>
+            <CardHeader>
+              <div className="animate-pulse">
+                <div className="h-6 bg-gray-200 rounded w-1/3"></div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="animate-pulse space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="h-6 bg-gray-200 rounded w-20 mb-2"></div>
+                    <div className="h-4 bg-gray-200 rounded w-16"></div>
+                  </div>
+                  <div className="h-6 bg-gray-200 rounded w-12"></div>
+                </div>
+                <div className="h-16 bg-gray-200 rounded"></div>
+                <div className="h-20 bg-gray-200 rounded"></div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Chart skeleton */}
+          <Card>
+            <CardHeader>
+              <div className="animate-pulse">
+                <div className="h-6 bg-gray-200 rounded w-1/3 mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="animate-pulse">
+                <div className="h-64 bg-gray-200 rounded"></div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Subscription Plans skeleton */}
+        <Card>
+          <CardHeader>
+            <div className="animate-pulse">
+              <div className="h-6 bg-gray-200 rounded w-1/4 mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="h-64 bg-gray-200 rounded"></div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Custom Credit Packages skeleton */}
+        <Card>
+          <CardHeader>
+            <div className="animate-pulse">
+              <div className="h-6 bg-gray-200 rounded w-1/4 mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="h-40 bg-gray-200 rounded"></div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Billing Management skeleton */}
+        <Card>
+          <CardHeader>
+            <div className="animate-pulse">
+              <div className="h-6 bg-gray-200 rounded w-1/4 mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="animate-pulse">
+              <div className="h-10 bg-gray-200 rounded w-32"></div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Transactions skeleton */}
+        <Card>
+          <CardHeader>
+            <div className="animate-pulse">
+              <div className="h-6 bg-gray-200 rounded w-1/4 mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="animate-pulse space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-12 bg-gray-200 rounded"></div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -781,3 +889,8 @@ export default function CreditsPage() {
     </div>
   )
 }
+
+// Memoize the component to prevent unnecessary re-renders
+const CreditsPage = memo(CreditsPageComponent)
+
+export default CreditsPage

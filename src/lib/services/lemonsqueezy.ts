@@ -53,10 +53,10 @@ export async function createLemonSqueezyCheckout(
     const apiKey = process.env.LEMONSQUEEZY_API_KEY
     const storeId = process.env.LEMONSQUEEZY_STORE_ID
     
-    // Debug: Log checkout attempt
-    console.log('Creating LemonSqueezy checkout for variant:', data.variantId)
+    // Validate environment variables
     
     if (!apiKey || !storeId) {
+      console.error('Missing LemonSqueezy configuration - API Key:', !!apiKey, 'Store ID:', !!storeId)
       throw new Error('LemonSqueezy is not configured. Please contact support.')
     }
 

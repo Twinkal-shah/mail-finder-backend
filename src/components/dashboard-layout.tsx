@@ -22,6 +22,7 @@ import {
   Menu,
   X,
   Key,
+  PlayCircle,
 } from 'lucide-react'
 import { getProfileDataClient } from '@/lib/profile'
 
@@ -60,6 +61,16 @@ const getNavigation = (userPlan: string) => {
   // Add API page for agency or lifetime plan users
   if (userPlan === 'agency' || userPlan === 'lifetime') {
     baseNavigation[1].items.push({ name: 'API', href: '/api', icon: Key })
+  }
+
+  // Add Video Tutorials section for agency or lifetime plan users
+  if (userPlan === 'agency' || userPlan === 'lifetime') {
+    baseNavigation.push({
+      name: 'TUTORIALS',
+      items: [
+        { name: 'Video Tutorials', href: '/video-tutorials', icon: PlayCircle },
+      ],
+    })
   }
 
   return baseNavigation
