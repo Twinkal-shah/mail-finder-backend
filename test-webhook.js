@@ -2,11 +2,12 @@ require('dotenv').config({ path: '.env.local' });
 const crypto = require('crypto');
 const fetch = require('node-fetch');
 
-const webhookSecret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET || 'mailsfinder123';
+const webhookSecret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET;
 const webhookUrl = 'https://wbcfsffssphgvpnbrvve.supabase.co/functions/v1/lemon-squeezy-webhook';
 
 if (!webhookSecret) {
   console.error('LEMONSQUEEZY_WEBHOOK_SECRET not found in environment');
+  console.error('Please add LEMONSQUEEZY_WEBHOOK_SECRET to your .env.local file');
   process.exit(1);
 }
 

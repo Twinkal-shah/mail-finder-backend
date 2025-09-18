@@ -2,6 +2,24 @@ import { createServiceRoleClient } from '@/lib/supabase'
 import crypto from 'crypto'
 import { SupabaseClient } from '@supabase/supabase-js'
 
+// Environment variable validation
+function validateLemonSqueezyConfig() {
+  const apiKey = process.env.LEMONSQUEEZY_API_KEY
+  const storeId = process.env.LEMONSQUEEZY_STORE_ID
+  const webhookSecret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET
+  
+  const missing = []
+  if (!apiKey) missing.push('LEMONSQUEEZY_API_KEY')
+  if (!storeId) missing.push('LEMONSQUEEZY_STORE_ID')
+  if (!webhookSecret) missing.push('LEMONSQUEEZY_WEBHOOK_SECRET')
+  
+  if (missing.length > 0) {
+    throw new Error(`Missing LemonSqueezy environment variables: ${missing.join(', ')}`)
+  }
+  
+  return { apiKey, storeId, webhookSecret }
+}
+
 export interface LemonSqueezyCheckoutData {
   productId: string
   variantId: string
@@ -50,15 +68,8 @@ export async function createLemonSqueezyCheckout(
   userId: string
 ): Promise<LemonSqueezyCheckoutResponse> {
   try {
-    const apiKey = process.env.LEMONSQUEEZY_API_KEY
-    const storeId = process.env.LEMONSQUEEZY_STORE_ID
-    
     // Validate environment variables
-    
-    if (!apiKey || !storeId) {
-      console.error('Missing LemonSqueezy configuration - API Key:', !!apiKey, 'Store ID:', !!storeId)
-      throw new Error('LemonSqueezy is not configured. Please contact support.')
-    }
+    const { apiKey, storeId } = validateLemonSqueezyConfig()
 
     // Create checkout session with LemonSqueezy API
     const response = await fetch('https://api.lemonsqueezy.com/v1/checkouts', {
@@ -161,11 +172,8 @@ export async function createLemonSqueezyPortal(
     
     console.log('No stored portal URL found, fetching from LemonSqueezy API for customer:', customerId)
     
-    const apiKey = process.env.LEMONSQUEEZY_API_KEY
-    
-    if (!apiKey) {
-      throw new Error('LemonSqueezy is not configured. Please contact support.')
-    }
+    // Validate environment variables
+    const { apiKey } = validateLemonSqueezyConfig()
 
     // First try to get customer data directly
     const customerResponse = await fetch(`https://api.lemonsqueezy.com/v1/customers/${customerId}`, {
