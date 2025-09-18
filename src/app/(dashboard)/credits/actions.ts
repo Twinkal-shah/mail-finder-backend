@@ -256,16 +256,45 @@ export async function createLemonSqueezyPortal() {
     .eq('id', user.id)
     .single()
   
-  if (!profile?.lemonsqueezy_customer_id) {
-    // User hasn't made any purchases yet, return URL to pricing tab
-    return { url: '/credits?tab=plans' }
+  let customerId = profile?.lemonsqueezy_customer_id
+  
+  // If no customer ID in profile, try to find it from transaction history
+  if (!customerId) {
+    const { data: transactions } = await supabase
+      .from('transactions')
+      .select('metadata')
+      .eq('user_id', user.id)
+      .not('metadata', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(10)
+    
+    // Look for customer ID in transaction metadata
+    for (const transaction of transactions || []) {
+      const transactionCustomerId = transaction.metadata?.event_data?.customer_id || 
+                                   transaction.metadata?.customer_id
+      if (transactionCustomerId) {
+        customerId = transactionCustomerId
+        
+        // Update profile with found customer ID
+        await supabase
+          .from('profiles')
+          .update({ lemonsqueezy_customer_id: customerId })
+          .eq('id', user.id)
+        
+        break
+      }
+    }
+  }
+  
+  if (!customerId) {
+    throw new Error('No billing information found. Please make a purchase first to access billing management.')
   }
   
   try {
     const { createLemonSqueezyPortal: createLSPortal } = await import('@/lib/services/lemonsqueezy')
     
     // Get the actual LemonSqueezy customer portal URL
-    const portalResponse = await createLSPortal(profile.lemonsqueezy_customer_id)
+    const portalResponse = await createLSPortal(customerId)
     return portalResponse
   } catch (error) {
     console.error('LemonSqueezy portal error:', error)
