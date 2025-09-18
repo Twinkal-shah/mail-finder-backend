@@ -38,6 +38,7 @@ export default function BulkFinderPage() {
   const [currentJob, setCurrentJob] = useState<BulkFinderJob | null>(null)
   const [jobHistory, setJobHistory] = useState<BulkFinderJob[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [originalFileName, setOriginalFileName] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Load user jobs on component mount
@@ -107,6 +108,10 @@ export default function BulkFinderPage() {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
+
+    // Store the original filename (without extension for later use)
+    const fileName = file.name.replace(/\.[^/.]+$/, '') // Remove extension
+    setOriginalFileName(fileName)
 
     const fileExtension = file.name.split('.').pop()?.toLowerCase()
 
@@ -250,7 +255,11 @@ export default function BulkFinderPage() {
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `bulk_finder_results_${job.jobId}.csv`
+    // Use original filename if available, otherwise use default
+    const downloadFileName = originalFileName 
+      ? `${originalFileName}.csv` 
+      : `bulk_finder_results_${job.jobId}.csv`
+    a.download = downloadFileName
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)

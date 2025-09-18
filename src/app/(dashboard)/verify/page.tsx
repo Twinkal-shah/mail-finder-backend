@@ -48,6 +48,7 @@ export default function VerifyPage() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [progress, setProgress] = useState(0)
   const [processedCount, setProcessedCount] = useState(0)
+  const [originalFileName, setOriginalFileName] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   
   // Background job tracking
@@ -186,6 +187,10 @@ export default function VerifyPage() {
     const file = event.target.files?.[0]
     if (!file) return
 
+    // Store the original filename (without extension for later use)
+    const fileName = file.name.replace(/\.[^/.]+$/, '') // Remove extension
+    setOriginalFileName(fileName)
+
     const fileExtension = file.name.split('.').pop()?.toLowerCase()
 
     if (fileExtension === 'csv') {
@@ -295,7 +300,11 @@ export default function VerifyPage() {
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `email-verification-results-${new Date().toISOString().split('T')[0]}.csv`
+      // Use original filename if available, otherwise use default
+      const downloadFileName = originalFileName 
+        ? `${originalFileName}.csv` 
+        : `email-verification-results-${new Date().toISOString().split('T')[0]}.csv`
+      a.download = downloadFileName
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
