@@ -25,6 +25,7 @@ import {
   PlayCircle,
 } from 'lucide-react'
 import { getProfileDataClient } from '@/lib/profile'
+import { OnboardingFlow } from '@/components/onboarding-flow'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -116,6 +117,9 @@ export function DashboardLayout({ children, userProfile }: DashboardLayoutProps)
 
   return (
     <div className="flex h-screen bg-gray-50">
+      {/* Onboarding Flow */}
+      <OnboardingFlow userProfile={currentProfile} />
+      
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
