@@ -25,7 +25,6 @@ import {
   PlayCircle,
 } from 'lucide-react'
 import { getProfileDataClient } from '@/lib/profile'
-import { EnvChecker } from '@/components/env-checker'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -263,7 +262,6 @@ export function DashboardLayout({ children, userProfile }: DashboardLayoutProps)
         {/* Page content */}
         <main className="flex-1 overflow-auto">
           <div className="p-4 sm:p-6 lg:p-8">
-            <EnvChecker />
             {children}
           </div>
         </main>
