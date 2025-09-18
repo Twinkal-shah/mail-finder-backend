@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+
 import { Progress } from '@/components/ui/progress'
 import { X, ArrowRight, Search, CheckCircle, CreditCard, Star } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
@@ -34,7 +34,7 @@ export function OnboardingFlow({ userProfile }: OnboardingFlowProps) {
     {
       id: 'find-email',
       title: 'Find Your First Email',
-      description: 'Click on "Find" in the sidebar and enter a person\'s full name and company domain to discover their email address.',
+      description: 'Click on "Find" in the sidebar and enter a person&apos;s full name and company domain to discover their email address.',
       icon: Search,
       targetPath: '/find',
       action: 'Try finding an email',
@@ -167,7 +167,7 @@ export function OnboardingFlow({ userProfile }: OnboardingFlowProps) {
             <div>
               <CardTitle className="text-lg">Welcome to MailsFinder!</CardTitle>
               <CardDescription>
-                Let's get you started with a quick tour
+                Let&apos;s get you started with a quick tour
               </CardDescription>
             </div>
           </div>
