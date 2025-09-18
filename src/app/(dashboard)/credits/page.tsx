@@ -64,7 +64,7 @@ const PLANS = {
     name: 'Pro',
     price: '$49',
     duration: 'per month',
-    features: ['50,000 Email Finds', '50,000 Email Verifications', 'Priority Support', 'API Access'],
+    features: ['5,000 Email Finds', '5,000 Email Verifications', 'Priority Support', 'API Access'],
     color: 'bg-blue-100 text-blue-800',
     icon: TrendingUp
   },
@@ -72,7 +72,7 @@ const PLANS = {
     name: 'Agency',
     price: '$99',
     duration: 'per month',
-    features: ['150,000 Email Finds', '150,000 Email Verifications', 'Premium Support', 'API Access', 'Priority Processing'],
+    features: ['50,000 Email Finds', '50,000 Email Verifications', 'Premium Support', 'API Access', 'Priority Processing'],
     color: 'bg-purple-100 text-purple-800',
     icon: TrendingUp
   },
@@ -80,7 +80,7 @@ const PLANS = {
     name: 'Lifetime',
     price: '$249',
     duration: 'one-time',
-    features: ['500,000 Email Finds', '500,000 Email Verifications', 'Premium Support', 'API Access', 'Future Updates'],
+    features: ['150,000 Email Finds', '150,000 Email Verifications', 'Premium Support', 'API Access', 'Future Updates'],
     color: 'bg-green-100 text-green-800',
     icon: TrendingUp
   }
