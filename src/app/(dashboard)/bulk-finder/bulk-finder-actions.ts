@@ -37,13 +37,12 @@ async function createSupabaseClient() {
 /**
  * Submit requests for bulk email finding as a background job
  */
-export async function submitBulkFinderJob(requests: BulkFindRequest[]): Promise<{
-  success: boolean
-  jobId?: string
-  error?: string
-}> {
+export async function submitBulkFinderJob(requests: BulkFindRequest[]): Promise<{ success: boolean; jobId?: string; error?: string }> {
+  console.log('🔥🔥🔥 SERVER ACTION CALLED 🔥🔥🔥')
+  console.log('submitBulkFinderJob called with requests:', requests.length)
   try {
     if (!requests || !Array.isArray(requests) || requests.length === 0) {
+      console.log('❌ Invalid requests array')
       return {
         success: false,
         error: 'Invalid requests array'
@@ -134,21 +133,37 @@ export async function submitBulkFinderJob(requests: BulkFindRequest[]): Promise<
     
     console.log('✅ Bulk finder job created successfully:', jobId)
 
-    // Trigger background processing
-    console.log('Triggering background processing for finder job:', jobId)
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/bulk-finder/jobs?jobId=${jobId}`, {
-      method: 'POST'
-    }).then(response => {
-      console.log('Background processing response:', response.status, response.statusText)
-      if (!response.ok) {
-        return response.text().then(text => {
-          console.error('Background processing failed:', text)
-        })
-      }
+    // Trigger background processing directly
+    console.log('🔥 Triggering background processing for finder job:', jobId)
+    try {
+      console.log('🔥 About to import processJobInBackground...')
+      // Import and call the background processing function directly
+      const { processJobInBackground } = await import('@/app/api/bulk-finder/jobs/route')
+      console.log('🔥 Successfully imported processJobInBackground')
+      
+      // Start background processing without waiting for it to complete
+      console.log('🔥 About to call processJobInBackground...')
+      processJobInBackground(jobId).catch(async (error) => {
+        console.error('Background processing failed for job:', jobId, error)
+        
+        // Update job status to failed if background processing fails
+        try {
+          await supabase
+            .from('bulk_finder_jobs')
+            .update({ 
+              status: 'failed',
+              error_message: error.message || 'Background processing failed'
+            })
+            .eq('id', jobId)
+        } catch (updateError) {
+          console.error('Failed to update job status to failed:', updateError)
+        }
+      })
+      
       console.log('Background processing started successfully')
-    }).catch(error => {
+    } catch (error) {
       console.error('Error triggering background processing:', error)
-    })
+    }
 
     revalidatePath('/(dashboard)', 'layout')
 

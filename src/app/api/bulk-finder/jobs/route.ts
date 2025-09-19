@@ -22,11 +22,12 @@ async function createSupabaseClient() {
 // GET endpoint to fetch user bulk finder jobs
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
+    // Import getCurrentUser here to avoid import issues
+    const { getCurrentUser } = await import('@/lib/auth')
     
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID required' }, { status: 400 })
+    const user = await getCurrentUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const supabase = await createSupabaseClient()
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
     const { data: jobs, error } = await supabase
       .from('bulk_finder_jobs')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(10)
 
@@ -53,15 +54,31 @@ export async function GET(request: NextRequest) {
 // POST endpoint for background processing
 export async function POST(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const jobId = searchParams.get('jobId')
+    const body = await request.json()
+    const { jobId } = body
     
     if (!jobId) {
       return NextResponse.json({ error: 'Job ID required' }, { status: 400 })
     }
 
-    // Start background processing
-    processJobInBackground(jobId)
+    // Start background processing with proper error handling
+    processJobInBackground(jobId).catch(async (error) => {
+      console.error('Background processing failed for job:', jobId, error)
+      
+      // Update job status to failed if background processing fails
+      try {
+        const supabase = await createSupabaseClient()
+        await supabase
+          .from('bulk_finder_jobs')
+          .update({ 
+            status: 'failed',
+            error_message: error.message || 'Background processing failed'
+          })
+          .eq('id', jobId)
+      } catch (updateError) {
+        console.error('Failed to update job status to failed:', updateError)
+      }
+    })
     
     return NextResponse.json({ success: true })
   } catch (error) {
@@ -71,7 +88,7 @@ export async function POST(request: NextRequest) {
 }
 
 // Background processing function
-async function processJobInBackground(jobId: string) {
+export async function processJobInBackground(jobId: string) {
   console.log(`🚀 Starting background processing for job: ${jobId}`)
   const supabase = await createSupabaseClient()
   
@@ -85,17 +102,25 @@ async function processJobInBackground(jobId: string) {
 
     if (jobError || !job) {
       console.error('Job not found:', jobError)
-      return
+      throw new Error(`Job not found: ${jobError?.message || 'Unknown error'}`)
     }
 
+    console.log(`Processing job ${jobId} with ${(job.requests_data as BulkFindRequest[]).length} requests`)
+
     // Update job status to processing
-    await supabase
+    const { error: updateError } = await supabase
       .from('bulk_finder_jobs')
       .update({ 
         status: 'processing',
         updated_at: new Date().toISOString()
       })
       .eq('id', jobId)
+      
+    if (updateError) {
+      throw new Error(`Failed to update job status to processing: ${updateError.message}`)
+    }
+    
+    console.log(`Job ${jobId} status updated to processing`)
 
     const requests: BulkFindRequest[] = job.requests_data as BulkFindRequest[]
     let processedCount = job.processed_requests || 0
@@ -186,7 +211,7 @@ async function processJobInBackground(jobId: string) {
         processedCount++
 
         // Update progress in database
-        await supabase
+        const { error: progressError } = await supabase
           .from('bulk_finder_jobs')
           .update({
             processed_requests: processedCount,
@@ -197,6 +222,10 @@ async function processJobInBackground(jobId: string) {
             updated_at: new Date().toISOString()
           })
           .eq('id', jobId)
+          
+        if (progressError) {
+          console.error(`Error updating progress for job ${jobId}:`, progressError)
+        }
 
         // Add small delay to prevent overwhelming the API
         await new Promise(resolve => setTimeout(resolve, 100))
@@ -208,7 +237,7 @@ async function processJobInBackground(jobId: string) {
         failedCount++
         processedCount++
 
-        await supabase
+        const { error: errorUpdateError } = await supabase
           .from('bulk_finder_jobs')
           .update({
             processed_requests: processedCount,
@@ -218,11 +247,15 @@ async function processJobInBackground(jobId: string) {
             updated_at: new Date().toISOString()
           })
           .eq('id', jobId)
+          
+        if (errorUpdateError) {
+          console.error(`Error updating job after processing error for job ${jobId}:`, errorUpdateError)
+        }
       }
     }
 
     // Mark job as completed
-    await supabase
+    const { error: completionError } = await supabase
       .from('bulk_finder_jobs')
       .update({
         status: 'completed',
@@ -230,6 +263,11 @@ async function processJobInBackground(jobId: string) {
         updated_at: new Date().toISOString()
       })
       .eq('id', jobId)
+      
+    if (completionError) {
+      console.error(`Error marking job ${jobId} as completed:`, completionError)
+      throw new Error(`Failed to mark job as completed: ${completionError.message}`)
+    }
 
     console.log(`Bulk finder job ${jobId} completed successfully`)
 
@@ -237,7 +275,7 @@ async function processJobInBackground(jobId: string) {
     console.error(`Error processing bulk finder job ${jobId}:`, error)
     
     // Mark job as failed
-    await supabase
+    const { error: failureUpdateError } = await supabase
       .from('bulk_finder_jobs')
       .update({
         status: 'failed',
@@ -245,5 +283,9 @@ async function processJobInBackground(jobId: string) {
         updated_at: new Date().toISOString()
       })
       .eq('id', jobId)
+      
+    if (failureUpdateError) {
+      console.error(`Error marking job ${jobId} as failed:`, failureUpdateError)
+    }
   }
 }

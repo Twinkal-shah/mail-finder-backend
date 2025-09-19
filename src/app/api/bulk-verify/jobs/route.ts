@@ -73,8 +73,8 @@ export async function GET() {
 // POST: Trigger background processing for a specific job
 export async function POST(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const jobId = searchParams.get('jobId')
+    const body = await request.json()
+    const { jobId } = body
 
     if (!jobId) {
       return NextResponse.json(

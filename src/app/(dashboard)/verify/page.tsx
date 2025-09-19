@@ -11,7 +11,7 @@ import { Upload, Download, Play, Shield, AlertCircle, CheckCircle, Clock, Pause 
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 import { verifySingleEmail, exportVerifyResults } from './actions'
-import { submitBulkVerificationJob, getBulkVerificationJobStatus, getUserBulkVerificationJobs, stopBulkVerificationJob } from './bulk-actions'
+import { submitBulkVerificationJob, getBulkVerificationJobStatus, stopBulkVerificationJob } from './bulk-actions'
 import type { BulkVerificationJob } from './types'
 
 interface VerifyRow {
@@ -122,12 +122,17 @@ export default function VerifyPage() {
   // Load user's bulk verification jobs
   const loadUserJobs = async () => {
     try {
-      const result = await getUserBulkVerificationJobs()
-      if (result.success && result.jobs) {
-        setAllJobs(result.jobs)
+      const response = await fetch('/api/bulk-verify/jobs')
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      const data = await response.json()
+      
+      if (data.jobs) {
+        setAllJobs(data.jobs)
         
         // Check if there's an active job
-        const activeJob = result.jobs.find(job => job.status === 'processing' || job.status === 'pending')
+        const activeJob = data.jobs.find((job: BulkVerificationJob) => job.status === 'processing' || job.status === 'pending')
         if (activeJob && !currentJob) {
           setCurrentJob(activeJob)
           setIsProcessing(true)

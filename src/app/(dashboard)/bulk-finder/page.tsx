@@ -10,7 +10,7 @@ import { toast } from 'sonner'
 import { Upload, Download, Play, Users, Clock, CheckCircle, XCircle, Pause } from 'lucide-react'
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
-import { submitBulkFinderJob, getBulkFinderJobStatus, getUserBulkFinderJobs, stopBulkFinderJob } from './bulk-finder-actions'
+import { submitBulkFinderJob, getBulkFinderJobStatus, stopBulkFinderJob } from './bulk-finder-actions'
 import type { BulkFinderJob, BulkFindRequest } from './types'
 
 interface BulkRow {
@@ -91,17 +91,40 @@ export default function BulkFinderPage() {
   }, [currentJob])
 
   const loadUserJobs = async () => {
-    const result = await getUserBulkFinderJobs()
-    if (result.success && result.jobs) {
-      setJobHistory(result.jobs)
-      
-      // Check if there's an active job
-      const activeJob = result.jobs.find(job => 
-        job.status === 'pending' || job.status === 'processing'
-      )
-      if (activeJob) {
-        setCurrentJob(activeJob)
+    try {
+      const response = await fetch('/api/bulk-finder/jobs')
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
+      const data = await response.json()
+      
+      if (data.jobs) {
+        // Format the jobs to match the expected structure
+        const formattedJobs: BulkFinderJob[] = data.jobs.map((job: any) => ({
+          jobId: job.id,
+          status: job.status,
+          totalRequests: job.total_requests,
+          processedRequests: job.processed_requests,
+          successfulFinds: job.successful_finds,
+          failedFinds: job.failed_finds,
+          requestsData: job.requests_data,
+          errorMessage: job.error_message,
+          createdAt: job.created_at,
+          updatedAt: job.updated_at
+        }))
+        
+        setJobHistory(formattedJobs)
+        
+        // Check if there's an active job
+        const activeJob = formattedJobs.find(job => 
+          job.status === 'pending' || job.status === 'processing'
+        )
+        if (activeJob) {
+          setCurrentJob(activeJob)
+        }
+      }
+    } catch (error) {
+      console.error('Error loading user jobs:', error)
     }
   }
 
@@ -178,14 +201,21 @@ export default function BulkFinderPage() {
 
 
   const submitJob = async () => {
+    console.log('=== SUBMIT JOB CLICKED ===')
+    console.log('Current state:', { isJobActive, isSubmitting, rowsLength: rows.length })
+    console.log('Button disabled?', isJobActive || isSubmitting || rows.length === 0)
+    console.log('🚀 submitJob called')
     const validRows = rows.filter(row => row.fullName && row.domain)
+    console.log('✅ Valid rows:', validRows.length)
     
     if (validRows.length === 0) {
+      console.log('❌ No valid rows found')
       toast.error('Please add at least one valid row with Full Name and Domain')
       return
     }
 
     setIsSubmitting(true)
+    console.log('📤 About to submit job...')
 
     try {
       const requests: BulkFindRequest[] = validRows.map(row => ({
@@ -193,8 +223,11 @@ export default function BulkFinderPage() {
         domain: row.domain,
         role: row.role
       }))
+      console.log('📋 Prepared requests:', requests)
 
+      console.log('Calling submitBulkFinderJob...')
       const result = await submitBulkFinderJob(requests)
+      console.log('📥 Job submission result:', result)
       
       if (result.success && result.jobId) {
         toast.success('Bulk finder job submitted successfully!')

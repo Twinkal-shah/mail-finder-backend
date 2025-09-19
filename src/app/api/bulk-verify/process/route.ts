@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function processJobInBackground(jobId: string) {
+export async function processJobInBackground(jobId: string) {
   console.log('processJobInBackground called for job:', jobId)
   // Use setTimeout to ensure this runs in the background
   setTimeout(() => {

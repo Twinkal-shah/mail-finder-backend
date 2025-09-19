@@ -29,8 +29,10 @@ export async function submitBulkVerificationJob(emails: string[]): Promise<{
   jobId?: string
   error?: string
 }> {
+  console.log('🔥 submitBulkVerificationJob called with:', emails.length, 'emails')
   try {
     if (!emails || !Array.isArray(emails) || emails.length === 0) {
+      console.log('❌ Invalid emails array')
       return {
         success: false,
         error: 'Invalid emails array'
@@ -111,21 +113,34 @@ export async function submitBulkVerificationJob(emails: string[]): Promise<{
       }
     }
 
-    // Trigger background processing
+    // Trigger background processing directly
     console.log('Triggering background processing for job:', jobId)
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/bulk-verify/jobs?jobId=${jobId}`, {
-      method: 'POST'
-    }).then(response => {
-      console.log('Background processing response:', response.status, response.statusText)
-      if (!response.ok) {
-        return response.text().then(text => {
-          console.error('Background processing failed:', text)
-        })
-      }
+    try {
+      // Import and call the background processing function directly
+      const { processJobInBackground } = await import('@/app/api/bulk-verify/process/route')
+      
+      // Start background processing without waiting for it to complete
+      processJobInBackground(jobId).catch(async (error) => {
+        console.error('Background processing failed for job:', jobId, error)
+        
+        // Update job status to failed if background processing fails
+        try {
+          await supabase
+            .from('bulk_verification_jobs')
+            .update({ 
+              status: 'failed',
+              error_message: error.message || 'Background processing failed'
+            })
+            .eq('id', jobId)
+        } catch (updateError) {
+          console.error('Failed to update job status to failed:', updateError)
+        }
+      })
+      
       console.log('Background processing started successfully')
-    }).catch(error => {
-      console.error('Error triggering background processing:', error)
-    })
+     } catch (error) {
+       console.error('Error triggering background processing:', error)
+     }
 
     revalidatePath('/(dashboard)', 'layout')
 
