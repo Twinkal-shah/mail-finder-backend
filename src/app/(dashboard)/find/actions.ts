@@ -21,6 +21,7 @@ interface FindEmailResponse {
   success: boolean
   result?: EmailResult
   error?: string
+  invalidateQueries?: boolean
 }
 
 
@@ -109,7 +110,8 @@ export async function findEmail(request: FindEmailRequest): Promise<FindEmailRes
     
     return {
       success: true,
-      result
+      result,
+      invalidateQueries: true // Signal to invalidate React Query cache
     }
   } catch (error) {
     console.error('Find email error:', error)

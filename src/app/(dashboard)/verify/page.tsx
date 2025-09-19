@@ -12,6 +12,7 @@ import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 import { submitBulkVerificationJob, getBulkVerificationJobStatus, stopBulkVerificationJob } from './bulk-actions'
 import type { BulkVerificationJob } from './types'
+import { useQueryInvalidation } from '@/lib/query-invalidation'
 
 interface VerifyRow {
   id: number
@@ -42,17 +43,15 @@ export default function VerifyPage() {
   const [singleEmail, setSingleEmail] = useState('')
   const [singleResult, setSingleResult] = useState<{ status: string; reason?: string; error?: string } | null>(null)
   const [isVerifyingSingle, setIsVerifyingSingle] = useState(false)
-  
   const [rows, setRows] = useState<VerifyRow[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
   const [progress, setProgress] = useState(0)
   const [processedCount, setProcessedCount] = useState(0)
-  const [originalFileName, setOriginalFileName] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  
-  // Background job tracking
   const [currentJob, setCurrentJob] = useState<BulkVerificationJob | null>(null)
+  const [originalFileName, setOriginalFileName] = useState<string>('')
   const [allJobs, setAllJobs] = useState<BulkVerificationJob[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { invalidateCreditsData } = useQueryInvalidation()
   // const [isSubmittingJob, setIsSubmittingJob] = useState(false) // Currently unused
 
   // Poll job status every 3 seconds
@@ -97,6 +96,8 @@ export default function VerifyPage() {
             setIsProcessing(false)
             toast.success(`Bulk verification completed! ${job.successfulVerifications || 0} emails verified successfully.`)
             loadUserJobs() // Refresh job list
+            // Invalidate queries for real-time credit updates
+            invalidateCreditsData()
           } else if (job.status === 'failed') {
             setIsProcessing(false)
             toast.error(`Bulk verification failed: ${job.errorMessage || 'Unknown error'}`)
@@ -116,7 +117,7 @@ export default function VerifyPage() {
     }
     
     poll()
-  }, [setCurrentJob, setProgress, setProcessedCount, setRows, setIsProcessing])
+  }, [setCurrentJob, setProgress, setProcessedCount, setRows, setIsProcessing, invalidateCreditsData])
 
   // Load user's bulk verification jobs
   const loadUserJobs = useCallback(async () => {
@@ -167,12 +168,12 @@ export default function VerifyPage() {
     setSingleResult(null)
 
     try {
-      const response = await fetch('/api/bulk-verify', {
+      const response = await fetch('/verify/api', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ emails: [singleEmail] }),
+        body: JSON.stringify({ email: singleEmail }),
       })
       
       const data = await response.json()
@@ -180,18 +181,27 @@ export default function VerifyPage() {
         throw new Error(data.error || 'Failed to verify email')
       }
       
-      const result = data.results?.[0] || { status: 'error', reason: 'No result returned' }
-      setSingleResult({ status: result.status, reason: result.reason, error: result.error })
+      // Debug log to see the actual response
+      console.log('API Response:', data)
       
-      if (result.status === 'valid') {
+      setSingleResult({ 
+        status: data.status, 
+        reason: typeof data.reason === 'string' && data.reason ? data.reason : undefined, 
+        error: typeof data.error === 'string' && data.error ? data.error : undefined 
+      })
+      
+      if (data.status === 'valid') {
         toast.success('Email is valid!')
-      } else if (result.status === 'invalid') {
+      } else if (data.status === 'invalid') {
         toast.error('Email is invalid')
-      } else if (result.status === 'risky') {
+      } else if (data.status === 'risky') {
         toast.warning('Email is risky')
-      } else if (result.status === 'error') {
-        toast.error(result.error || 'Failed to verify email')
+      } else if (data.status === 'error') {
+        toast.error(data.error || 'Failed to verify email')
       }
+      
+      // Invalidate queries for real-time credit updates
+      invalidateCreditsData()
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to verify email'
       toast.error(errorMessage)
@@ -405,9 +415,14 @@ export default function VerifyPage() {
                     <p className="font-medium">
                       Status: <span className="capitalize">{singleResult.status === 'valid' ? 'Valid' : singleResult.status}</span>
                     </p>
-                    {singleResult.reason && (
+                    {singleResult.reason && singleResult.reason.trim() && (
                       <p className="text-sm text-gray-600">
                         Reason: {singleResult.reason}
+                      </p>
+                    )}
+                    {singleResult.error && singleResult.error.trim() && (
+                      <p className="text-sm text-red-600">
+                        Error: {singleResult.error}
                       </p>
                     )}
                   </div>

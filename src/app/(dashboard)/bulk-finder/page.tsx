@@ -12,6 +12,7 @@ import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 import { submitBulkFinderJob, getBulkFinderJobStatus, stopBulkFinderJob } from './bulk-finder-actions'
 import type { BulkFinderJob, BulkFindRequest } from './types'
+import { useQueryInvalidation } from '@/lib/query-invalidation'
 
 interface BulkRow {
   id: string
@@ -40,6 +41,7 @@ export default function BulkFinderPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [originalFileName, setOriginalFileName] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { invalidateCreditsData } = useQueryInvalidation()
 
   // Load user jobs on component mount
   useEffect(() => {
@@ -76,6 +78,8 @@ export default function BulkFinderPage() {
           if (result.job.status === 'completed' || result.job.status === 'failed') {
             clearInterval(interval)
             loadUserJobs() // Refresh job history
+            // Invalidate queries for real-time credit updates
+            invalidateCreditsData()
             
             if (result.job.status === 'completed') {
               toast.success('Bulk finder job completed!')

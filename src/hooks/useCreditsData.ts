@@ -8,9 +8,11 @@ export function useUserProfile() {
   return useQuery({
     queryKey: ['userProfile'],
     queryFn: getUserProfileWithCredits,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 30 * 1000, // 30 seconds for more real-time updates
     gcTime: 5 * 60 * 1000, // 5 minutes
     retry: 2,
+    refetchInterval: 60 * 1000, // Auto-refetch every minute for real-time updates
+    refetchIntervalInBackground: true, // Continue refetching even when tab is not active
   })
 }
 
@@ -30,9 +32,11 @@ export function useCreditUsageHistory() {
   return useQuery({
     queryKey: ['creditUsageHistory'],
     queryFn: getCreditUsageHistory,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 30 * 1000, // 30 seconds for more real-time updates
     gcTime: 5 * 60 * 1000, // 5 minutes
     retry: 2,
+    refetchInterval: 60 * 1000, // Auto-refetch every minute for real-time updates
+    refetchIntervalInBackground: true, // Continue refetching even when tab is not active
   })
 }
 
