@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
     try {
       body = await request.json()
     } catch (error) {
+      console.error('Error parsing request body:', error)
       return createApiErrorResponse('Invalid JSON in request body', 400)
     }
 

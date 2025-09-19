@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -56,7 +56,7 @@ export default function VerifyPage() {
   // const [isSubmittingJob, setIsSubmittingJob] = useState(false) // Currently unused
 
   // Poll job status every 3 seconds
-  const pollJobStatus = async (jobId: string) => {
+  const pollJobStatus = useCallback(async (jobId: string) => {
     const poll = async () => {
       try {
         const result = await getBulkVerificationJobStatus(jobId)
@@ -116,10 +116,10 @@ export default function VerifyPage() {
     }
     
     poll()
-  }
+  }, [setCurrentJob, setProgress, setProcessedCount, setRows, setIsProcessing])
 
   // Load user's bulk verification jobs
-  const loadUserJobs = async () => {
+  const loadUserJobs = useCallback(async () => {
     try {
       const response = await fetch('/api/bulk-verify/jobs')
       if (!response.ok) {
@@ -141,7 +141,7 @@ export default function VerifyPage() {
     } catch (error) {
       console.error('Error loading user jobs:', error)
     }
-  }
+  }, [currentJob, pollJobStatus])
 
   // Load jobs on component mount
   useEffect(() => {

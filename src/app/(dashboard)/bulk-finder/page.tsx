@@ -100,7 +100,19 @@ export default function BulkFinderPage() {
       
       if (data.jobs) {
         // Format the jobs to match the expected structure
-        const formattedJobs: BulkFinderJob[] = data.jobs.map((job: any) => ({
+        const formattedJobs: BulkFinderJob[] = data.jobs.map((job: {
+          id: string;
+          status: string;
+          total_requests: number;
+          processed_requests?: number;
+          successful_finds?: number;
+          failed_finds?: number;
+          requests_data?: BulkFindRequest[];
+          error_message?: string;
+          created_at?: string;
+          updated_at?: string;
+          completed_at?: string;
+        }) => ({
           jobId: job.id,
           status: job.status,
           totalRequests: job.total_requests,

@@ -20,7 +20,7 @@ async function createSupabaseClient() {
 }
 
 // GET endpoint to fetch user bulk finder jobs
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Import getCurrentUser here to avoid import issues
     const { getCurrentUser } = await import('@/lib/auth')

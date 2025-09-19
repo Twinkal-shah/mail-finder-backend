@@ -152,6 +152,7 @@ export async function submitBulkFinderJob(requests: BulkFindRequest[]): Promise<
       jobId
     }
   } catch (error) {
+    console.error('Error submitting bulk finder job:', error)
     return {
       success: false,
       error: 'An unexpected error occurred. Please try again.'
