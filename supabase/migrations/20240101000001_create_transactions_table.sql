@@ -24,6 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status);
 CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at);
 
 -- Create updated_at trigger
+DROP TRIGGER IF EXISTS update_transactions_updated_at ON transactions;
 CREATE TRIGGER update_transactions_updated_at BEFORE UPDATE ON transactions
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -31,10 +32,12 @@ CREATE TRIGGER update_transactions_updated_at BEFORE UPDATE ON transactions
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 
 -- Create policy for users to read their own transactions
+DROP POLICY IF EXISTS "Users can view own transactions" ON transactions;
 CREATE POLICY "Users can view own transactions" ON transactions
     FOR SELECT USING (user_id = auth.uid());
 
 -- Create policy for service role to insert/update transactions (for webhooks)
+DROP POLICY IF EXISTS "Service role can manage transactions" ON transactions;
 CREATE POLICY "Service role can manage transactions" ON transactions
     FOR ALL USING (auth.role() = 'service_role');
 

@@ -1,4 +1,4 @@
--- Update the deduct_credits function to log transactions
+-- Fix ambiguous column reference in deduct_credits function
 CREATE OR REPLACE FUNCTION deduct_credits(
     required INTEGER,
     operation TEXT,

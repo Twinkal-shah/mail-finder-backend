@@ -137,9 +137,9 @@ BEGIN
         END IF;
     END IF;
     
-    -- Insert transaction record (optional - only if credit_transactions table exists)
-    -- INSERT INTO credit_transactions (user_id, amount, type, operation, metadata, created_at)
-    -- VALUES (user_id, -required, 'debit', operation, meta, NOW());
+    -- Insert transaction record
+    INSERT INTO credit_transactions (user_id, amount, operation, meta, created_at)
+    VALUES (user_id, -required, operation, meta, NOW());
     
     RETURN TRUE;
 END;

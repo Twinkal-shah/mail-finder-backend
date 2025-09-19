@@ -22,19 +22,24 @@ CREATE INDEX IF NOT EXISTS api_keys_active_idx ON api_keys(is_active);
 ALTER TABLE api_keys ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policies
+DROP POLICY IF EXISTS "Users can view own API keys" ON api_keys;
 CREATE POLICY "Users can view own API keys" ON api_keys
     FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own API keys" ON api_keys;
 CREATE POLICY "Users can insert own API keys" ON api_keys
     FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own API keys" ON api_keys;
 CREATE POLICY "Users can update own API keys" ON api_keys
     FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own API keys" ON api_keys;
 CREATE POLICY "Users can delete own API keys" ON api_keys
     FOR DELETE USING (auth.uid() = user_id);
 
 -- Service role can manage all API keys
+DROP POLICY IF EXISTS "Service role can manage API keys" ON api_keys;
 CREATE POLICY "Service role can manage API keys" ON api_keys
     FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
 

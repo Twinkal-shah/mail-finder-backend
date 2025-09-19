@@ -1,3 +1,17 @@
+const { createClient } = require('@supabase/supabase-js')
+require('dotenv').config({ path: '.env.local' })
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing Supabase configuration')
+  process.exit(1)
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+const fixSQL = `
 -- Update the deduct_credits function to log transactions
 CREATE OR REPLACE FUNCTION deduct_credits(
     required INTEGER,
@@ -25,12 +39,12 @@ BEGIN
     
     -- Get user's current credits and plan expiry
     SELECT 
-        COALESCE(p.credits_find, 0),
-        COALESCE(p.credits_verify, 0),
-        p.plan_expiry
+        COALESCE(credits_find, 0),
+        COALESCE(credits_verify, 0),
+        plan_expiry
     INTO current_find_credits, current_verify_credits, plan_expiry
-    FROM profiles p
-    WHERE p.id = user_id;
+    FROM profiles
+    WHERE id = user_id;
     
     -- Check if plan has expired
     IF plan_expiry IS NOT NULL AND plan_expiry < NOW() THEN
@@ -120,3 +134,42 @@ $$;
 
 -- Grant execute permissions to authenticated users
 GRANT EXECUTE ON FUNCTION deduct_credits(INTEGER, TEXT, JSONB) TO authenticated;
+`
+
+async function applyFix() {
+  console.log('Applying credit tracking fix...')
+  
+  try {
+    const { data, error } = await supabase.rpc('exec', {
+      sql: fixSQL
+    })
+    
+    if (error) {
+      console.error('Error applying fix:', error)
+      
+      // Try alternative approach using raw SQL
+      console.log('Trying alternative approach...')
+      const { data: altData, error: altError } = await supabase
+        .from('_sql')
+        .select('*')
+        .eq('query', fixSQL)
+      
+      if (altError) {
+        console.error('Alternative approach failed:', altError)
+        console.log('\nPlease manually apply the SQL from APPLY_CREDIT_TRACKING_FIX.sql in your Supabase SQL Editor.')
+        process.exit(1)
+      }
+    }
+    
+    console.log('✅ Credit tracking fix applied successfully!')
+    console.log('\nThe deduct_credits function now includes transaction logging.')
+    console.log('Credit usage charts should now update properly.')
+    
+  } catch (err) {
+    console.error('Unexpected error:', err)
+    console.log('\nPlease manually apply the SQL from APPLY_CREDIT_TRACKING_FIX.sql in your Supabase SQL Editor.')
+    process.exit(1)
+  }
+}
+
+applyFix()

@@ -82,8 +82,30 @@ export async function POST(request: NextRequest) {
     const serviceResult = await verifyEmail(verificationRequest)
 
     // Deduct credits after successful verification
-    await deductCredits(1, 'email_verification')
+    // await deductCredits(1, 'email_verification')
+      // Deduct credits after successful verification
 
+        try {
+      console.log('About to call deductCredits with:', {
+        amount: 1,
+        type: 'email_verify',
+        metadata: {
+          email: body.email,
+          result: serviceResult.status
+        }
+      })
+
+    await deductCredits(1, 'email_verify', {
+      email: body.email,
+      result: serviceResult.status
+    })
+
+      console.log('deductCredits completed successfully')
+    } catch (deductError) {
+      console.error('Error in deductCredits:', deductError)
+      // Don't fail the entire request if credit deduction fails
+      // but log it for debugging
+    }
     // Map service result to API response
     const response: VerifyEmailResponse = {
       email: serviceResult.email,

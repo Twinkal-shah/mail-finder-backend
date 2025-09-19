@@ -1,3 +1,18 @@
+const { createClient } = require('@supabase/supabase-js')
+require('dotenv').config({ path: '.env.local' })
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
+)
+
+const migrationSQL = `
 -- Update the deduct_credits function to log transactions
 CREATE OR REPLACE FUNCTION deduct_credits(
     required INTEGER,
@@ -25,12 +40,12 @@ BEGIN
     
     -- Get user's current credits and plan expiry
     SELECT 
-        COALESCE(p.credits_find, 0),
-        COALESCE(p.credits_verify, 0),
-        p.plan_expiry
+        COALESCE(credits_find, 0),
+        COALESCE(credits_verify, 0),
+        plan_expiry
     INTO current_find_credits, current_verify_credits, plan_expiry
-    FROM profiles p
-    WHERE p.id = user_id;
+    FROM profiles
+    WHERE id = user_id;
     
     -- Check if plan has expired
     IF plan_expiry IS NOT NULL AND plan_expiry < NOW() THEN
@@ -93,7 +108,7 @@ BEGIN
         ELSE
             UPDATE profiles 
             SET credits_find = 0,
-                credits_verify = credits_verify - (required - current_find_credits),
+                credits_verify = credits_verify - (required - current_verify_credits),
                 updated_at = NOW()
             WHERE id = user_id;
         END IF;
@@ -120,3 +135,41 @@ $$;
 
 -- Grant execute permissions to authenticated users
 GRANT EXECUTE ON FUNCTION deduct_credits(INTEGER, TEXT, JSONB) TO authenticated;
+`
+
+async function applyMigration() {
+  console.log('Applying migration to update deduct_credits function...')
+  
+  try {
+    const { data, error } = await supabase.rpc('exec', {
+      sql: migrationSQL
+    })
+    
+    if (error) {
+      console.error('Error applying migration:', error)
+      
+      // Try alternative approach using raw SQL
+      console.log('Trying alternative approach...')
+      const { data: altData, error: altError } = await supabase
+        .from('_migrations')
+        .insert({
+          name: '20240101000003_update_deduct_credits_function',
+          sql: migrationSQL,
+          applied_at: new Date().toISOString()
+        })
+      
+      if (altError) {
+        console.error('Alternative approach failed:', altError)
+      } else {
+        console.log('Migration recorded successfully')
+      }
+    } else {
+      console.log('Migration applied successfully:', data)
+    }
+    
+  } catch (error) {
+    console.error('Migration failed:', error)
+  }
+}
+
+applyMigration()

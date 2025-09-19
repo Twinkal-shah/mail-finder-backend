@@ -173,31 +173,26 @@ export async function processJobInBackground(jobId: string) {
           failedCount++
         }
 
-        // Deduct 1 credit for this processed row directly from database
+        // Deduct 1 credit for this processed row using the proper function
         try {
-          // First get current credits
-          const { data: profile, error: fetchError } = await supabase
-            .from('profiles')
-            .select('credits_find')
-            .eq('id', job.user_id)
-            .single()
+          const { data: deductResult, error: deductError } = await supabase
+            .rpc('deduct_credits', {
+              required: 1,
+              operation: 'email_find',
+              meta: {
+                bulk: true,
+                job_id: jobId,
+                row_index: i,
+                email_found: result.status === 'valid'
+              }
+            })
           
-          if (!fetchError && profile && profile.credits_find > 0) {
-            const { error: creditError } = await supabase
-              .from('profiles')
-              .update({
-                credits_find: profile.credits_find - 1,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', job.user_id)
-            
-            if (creditError) {
-              console.error(`Failed to deduct credit for row ${i}:`, creditError)
-            } else {
-      
-            }
+          if (deductError) {
+            console.error(`Failed to deduct credit for row ${i}:`, deductError)
+          } else if (!deductResult) {
+            console.log(`⚠️ Credit deduction failed for row ${i}, user: ${job.user_id} - insufficient credits`)
           } else {
-            console.log(`⚠️ No credits to deduct for row ${i}, user: ${job.user_id}`)
+            console.log(`✅ Successfully deducted 1 credit for row ${i}`)
           }
         } catch (error) {
           console.error(`Failed to deduct credit for row ${i}:`, error)

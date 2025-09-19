@@ -1,4 +1,29 @@
--- Update the deduct_credits function to log transactions
+require('dotenv').config({ path: '.env.local' });
+const { Pool } = require('pg');
+
+// Extract connection details from Supabase URL
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !serviceKey) {
+  console.error('Missing Supabase environment variables');
+  process.exit(1);
+}
+
+// Parse the Supabase URL to get database connection details
+const url = new URL(supabaseUrl);
+const projectRef = url.hostname.split('.')[0];
+
+const pool = new Pool({
+  host: `db.${projectRef}.supabase.co`,
+  port: 5432,
+  database: 'postgres',
+  user: 'postgres',
+  password: serviceKey,
+  ssl: { rejectUnauthorized: false }
+});
+
+const updateFunction = `
 CREATE OR REPLACE FUNCTION deduct_credits(
     required INTEGER,
     operation TEXT,
@@ -13,7 +38,6 @@ DECLARE
     current_find_credits INTEGER;
     current_verify_credits INTEGER;
     total_credits INTEGER;
-    plan_expiry TIMESTAMP WITH TIME ZONE;
 BEGIN
     -- Get the current user ID from auth.users
     user_id := auth.uid();
@@ -23,27 +47,13 @@ BEGIN
         RETURN FALSE;
     END IF;
     
-    -- Get user's current credits and plan expiry
+    -- Get user's current credits
     SELECT 
-        COALESCE(p.credits_find, 0),
-        COALESCE(p.credits_verify, 0),
-        p.plan_expiry
-    INTO current_find_credits, current_verify_credits, plan_expiry
-    FROM profiles p
-    WHERE p.id = user_id;
-    
-    -- Check if plan has expired
-    IF plan_expiry IS NOT NULL AND plan_expiry < NOW() THEN
-        -- Reset credits to 0 for expired plan
-        UPDATE profiles 
-        SET 
-            credits_find = 0,
-            credits_verify = 0,
-            updated_at = NOW()
-        WHERE id = user_id;
-        
-        RETURN FALSE;
-    END IF;
+        COALESCE(credits_find, 0),
+        COALESCE(credits_verify, 0)
+    INTO current_find_credits, current_verify_credits
+    FROM profiles
+    WHERE id = user_id;
     
     -- Calculate total available credits
     total_credits := current_find_credits + current_verify_credits;
@@ -55,13 +65,14 @@ BEGIN
     
     -- Deduct credits based on operation type
     IF operation = 'email_find' THEN
+        -- Deduct from find credits first, then verify credits if needed
         IF current_find_credits >= required THEN
             UPDATE profiles 
             SET credits_find = credits_find - required,
                 updated_at = NOW()
             WHERE id = user_id;
         ELSE
-            -- Deduct remaining from find credits and rest from verify credits
+            -- Use all find credits and remaining from verify credits
             UPDATE profiles 
             SET credits_find = 0,
                 credits_verify = credits_verify - (required - current_find_credits),
@@ -76,7 +87,7 @@ BEGIN
                 updated_at = NOW()
             WHERE id = user_id;
         ELSE
-            -- Deduct remaining from verify credits and rest from find credits
+            -- Use all verify credits and remaining from find credits
             UPDATE profiles 
             SET credits_verify = 0,
                 credits_find = credits_find - (required - current_verify_credits),
@@ -84,7 +95,7 @@ BEGIN
             WHERE id = user_id;
         END IF;
     ELSE
-        -- For unknown operations, deduct from find credits first
+        -- Default: deduct from find credits first
         IF current_find_credits >= required THEN
             UPDATE profiles 
             SET credits_find = credits_find - required,
@@ -93,30 +104,40 @@ BEGIN
         ELSE
             UPDATE profiles 
             SET credits_find = 0,
-                credits_verify = credits_verify - (required - current_find_credits),
+                credits_verify = credits_verify - (required - current_verify_credits),
                 updated_at = NOW()
             WHERE id = user_id;
         END IF;
     END IF;
     
-    -- Log the transaction in credit_transactions table
-    INSERT INTO credit_transactions (
-        user_id,
-        amount,
-        operation,
-        meta,
-        created_at
-    ) VALUES (
-        user_id,
-        -required, -- Negative amount for deduction
-        operation,
-        meta,
-        NOW()
-    );
+    -- Insert transaction record
+    INSERT INTO credit_transactions (user_id, credits_used, operation, meta, created_at)
+    VALUES (user_id, required, operation, meta, NOW());
     
     RETURN TRUE;
 END;
 $$;
 
--- Grant execute permissions to authenticated users
 GRANT EXECUTE ON FUNCTION deduct_credits(INTEGER, TEXT, JSONB) TO authenticated;
+`;
+
+async function updateDeductCreditsFunction() {
+  const client = await pool.connect();
+  
+  try {
+    console.log('Updating deduct_credits function...');
+    
+    const result = await client.query(updateFunction);
+    
+    console.log('Function updated successfully!');
+    console.log('Result:', result);
+    
+  } catch (error) {
+    console.error('Error updating function:', error.message);
+  } finally {
+    client.release();
+    await pool.end();
+  }
+}
+
+updateDeductCreditsFunction();
