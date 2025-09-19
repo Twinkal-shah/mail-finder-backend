@@ -38,11 +38,8 @@ async function createSupabaseClient() {
  * Submit requests for bulk email finding as a background job
  */
 export async function submitBulkFinderJob(requests: BulkFindRequest[]): Promise<{ success: boolean; jobId?: string; error?: string }> {
-  console.log('🔥🔥🔥 SERVER ACTION CALLED 🔥🔥🔥')
-  console.log('submitBulkFinderJob called with requests:', requests.length)
   try {
     if (!requests || !Array.isArray(requests) || requests.length === 0) {
-      console.log('❌ Invalid requests array')
       return {
         success: false,
         error: 'Invalid requests array'
@@ -102,12 +99,6 @@ export async function submitBulkFinderJob(requests: BulkFindRequest[]): Promise<
 
     const supabase = await createSupabaseClient()
     const jobId = crypto.randomUUID()
-    
-    console.log('Creating bulk finder job:', {
-      jobId,
-      userId: user.id,
-      totalRequests: requests.length
-    })
 
     // Insert job into database
     const { error: insertError } = await supabase
@@ -124,28 +115,19 @@ export async function submitBulkFinderJob(requests: BulkFindRequest[]): Promise<
       })
 
     if (insertError) {
-      console.error('Error creating bulk finder job:', insertError)
       return {
         success: false,
         error: 'Failed to create finder job'
       }
     }
-    
-    console.log('✅ Bulk finder job created successfully:', jobId)
 
     // Trigger background processing directly
-    console.log('🔥 Triggering background processing for finder job:', jobId)
     try {
-      console.log('🔥 About to import processJobInBackground...')
       // Import and call the background processing function directly
       const { processJobInBackground } = await import('@/app/api/bulk-finder/jobs/route')
-      console.log('🔥 Successfully imported processJobInBackground')
       
       // Start background processing without waiting for it to complete
-      console.log('🔥 About to call processJobInBackground...')
       processJobInBackground(jobId).catch(async (error) => {
-        console.error('Background processing failed for job:', jobId, error)
-        
         // Update job status to failed if background processing fails
         try {
           await supabase
@@ -159,8 +141,6 @@ export async function submitBulkFinderJob(requests: BulkFindRequest[]): Promise<
           console.error('Failed to update job status to failed:', updateError)
         }
       })
-      
-      console.log('Background processing started successfully')
     } catch (error) {
       console.error('Error triggering background processing:', error)
     }
@@ -172,7 +152,6 @@ export async function submitBulkFinderJob(requests: BulkFindRequest[]): Promise<
       jobId
     }
   } catch (error) {
-    console.error('Submit bulk finder job error:', error)
     return {
       success: false,
       error: 'An unexpected error occurred. Please try again.'

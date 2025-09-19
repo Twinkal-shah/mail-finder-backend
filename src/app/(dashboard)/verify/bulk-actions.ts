@@ -29,10 +29,8 @@ export async function submitBulkVerificationJob(emails: string[]): Promise<{
   jobId?: string
   error?: string
 }> {
-  console.log('🔥 submitBulkVerificationJob called with:', emails.length, 'emails')
   try {
     if (!emails || !Array.isArray(emails) || emails.length === 0) {
-      console.log('❌ Invalid emails array')
       return {
         success: false,
         error: 'Invalid emails array'
@@ -114,7 +112,6 @@ export async function submitBulkVerificationJob(emails: string[]): Promise<{
     }
 
     // Trigger background processing directly
-    console.log('Triggering background processing for job:', jobId)
     try {
       // Import and call the background processing function directly
       const { processJobInBackground } = await import('@/app/api/bulk-verify/process/route')
@@ -136,8 +133,6 @@ export async function submitBulkVerificationJob(emails: string[]): Promise<{
           console.error('Failed to update job status to failed:', updateError)
         }
       })
-      
-      console.log('Background processing started successfully')
      } catch (error) {
        console.error('Error triggering background processing:', error)
      }

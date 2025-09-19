@@ -100,18 +100,7 @@ export default function BulkFinderPage() {
       
       if (data.jobs) {
         // Format the jobs to match the expected structure
-        const formattedJobs: BulkFinderJob[] = data.jobs.map((job: {
-          id: string
-          status: string
-          total_requests: number
-          processed_requests: number
-          successful_finds: number
-          failed_finds: number
-          requests_data: BulkFindRequest[]
-          error_message?: string
-          created_at: string
-          updated_at: string
-        }) => ({
+        const formattedJobs: BulkFinderJob[] = data.jobs.map((job: any) => ({
           jobId: job.id,
           status: job.status,
           totalRequests: job.total_requests,
@@ -212,21 +201,14 @@ export default function BulkFinderPage() {
 
 
   const submitJob = async () => {
-    console.log('=== SUBMIT JOB CLICKED ===')
-    console.log('Current state:', { isJobActive, isSubmitting, rowsLength: rows.length })
-    console.log('Button disabled?', isJobActive || isSubmitting || rows.length === 0)
-    console.log('🚀 submitJob called')
     const validRows = rows.filter(row => row.fullName && row.domain)
-    console.log('✅ Valid rows:', validRows.length)
     
     if (validRows.length === 0) {
-      console.log('❌ No valid rows found')
       toast.error('Please add at least one valid row with Full Name and Domain')
       return
     }
 
     setIsSubmitting(true)
-    console.log('📤 About to submit job...')
 
     try {
       const requests: BulkFindRequest[] = validRows.map(row => ({
@@ -234,11 +216,8 @@ export default function BulkFinderPage() {
         domain: row.domain,
         role: row.role
       }))
-      console.log('📋 Prepared requests:', requests)
 
-      console.log('Calling submitBulkFinderJob...')
       const result = await submitBulkFinderJob(requests)
-      console.log('📥 Job submission result:', result)
       
       if (result.success && result.jobId) {
         toast.success('Bulk finder job submitted successfully!')

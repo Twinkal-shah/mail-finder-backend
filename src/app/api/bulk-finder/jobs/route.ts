@@ -20,7 +20,7 @@ async function createSupabaseClient() {
 }
 
 // GET endpoint to fetch user bulk finder jobs
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     // Import getCurrentUser here to avoid import issues
     const { getCurrentUser } = await import('@/lib/auth')
@@ -89,7 +89,6 @@ export async function POST(request: NextRequest) {
 
 // Background processing function
 export async function processJobInBackground(jobId: string) {
-  console.log(`🚀 Starting background processing for job: ${jobId}`)
   const supabase = await createSupabaseClient()
   
   try {
@@ -105,7 +104,7 @@ export async function processJobInBackground(jobId: string) {
       throw new Error(`Job not found: ${jobError?.message || 'Unknown error'}`)
     }
 
-    console.log(`Processing job ${jobId} with ${(job.requests_data as BulkFindRequest[]).length} requests`)
+
 
     // Update job status to processing
     const { error: updateError } = await supabase
@@ -119,8 +118,6 @@ export async function processJobInBackground(jobId: string) {
     if (updateError) {
       throw new Error(`Failed to update job status to processing: ${updateError.message}`)
     }
-    
-    console.log(`Job ${jobId} status updated to processing`)
 
     const requests: BulkFindRequest[] = job.requests_data as BulkFindRequest[]
     let processedCount = job.processed_requests || 0
@@ -139,7 +136,6 @@ export async function processJobInBackground(jobId: string) {
           .single()
 
         if (currentJob?.status === 'failed' || currentJob?.status === 'paused') {
-          console.log(`Job ${jobId} was stopped/paused`)
           break
         }
 
@@ -198,7 +194,7 @@ export async function processJobInBackground(jobId: string) {
             if (creditError) {
               console.error(`Failed to deduct credit for row ${i}:`, creditError)
             } else {
-              console.log(`✅ Deducted 1 credit for row ${i}, user: ${job.user_id}, remaining: ${profile.credits_find - 1}`)
+      
             }
           } else {
             console.log(`⚠️ No credits to deduct for row ${i}, user: ${job.user_id}`)
