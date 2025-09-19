@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -54,10 +54,38 @@ export default function VerifyPage() {
   // Background job tracking
   const [currentJob, setCurrentJob] = useState<BulkVerificationJob | null>(null)
   const [allJobs, setAllJobs] = useState<BulkVerificationJob[]>([])
+  const pollJobStatusRef = useRef<((jobId: string) => Promise<void>) | null>(null)
   // const [isSubmittingJob, setIsSubmittingJob] = useState(false) // Currently unused
 
+  // Load user's bulk verification jobs
+  const loadUserJobs = useCallback(async () => {
+    try {
+      const response = await fetch('/api/bulk-verify/jobs')
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      const data = await response.json()
+      
+      if (data.jobs) {
+        setAllJobs(data.jobs)
+        
+        // Check if there's an active job
+        const activeJob = data.jobs.find((job: BulkVerificationJob) => job.status === 'processing' || job.status === 'pending')
+        if (activeJob && !currentJob) {
+          setCurrentJob(activeJob)
+          setIsProcessing(true)
+          if (pollJobStatusRef.current) {
+            pollJobStatusRef.current(activeJob.jobId)
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading user jobs:', error)
+    }
+  }, [currentJob])
+
   // Poll job status every 3 seconds
-  const pollJobStatus = async (jobId: string) => {
+  const pollJobStatus = useCallback(async (jobId: string) => {
     const poll = async () => {
       try {
         const result = await getBulkVerificationJobStatus(jobId)
@@ -97,11 +125,39 @@ export default function VerifyPage() {
           if (job.status === 'completed') {
             setIsProcessing(false)
             toast.success(`Bulk verification completed! ${job.successfulVerifications || 0} emails verified successfully.`)
-            loadUserJobs() // Refresh job list
+            // Refresh job list after completion
+            const refreshJobs = async () => {
+              try {
+                const response = await fetch('/api/bulk-verify/jobs')
+                if (response.ok) {
+                  const data = await response.json()
+                  if (data.jobs) {
+                    setAllJobs(data.jobs)
+                  }
+                }
+              } catch (error) {
+                console.error('Error refreshing jobs:', error)
+              }
+            }
+            refreshJobs()
           } else if (job.status === 'failed') {
             setIsProcessing(false)
             toast.error(`Bulk verification failed: ${job.errorMessage || 'Unknown error'}`)
-            loadUserJobs() // Refresh job list
+            // Refresh job list after failure
+            const refreshJobs = async () => {
+              try {
+                const response = await fetch('/api/bulk-verify/jobs')
+                if (response.ok) {
+                  const data = await response.json()
+                  if (data.jobs) {
+                    setAllJobs(data.jobs)
+                  }
+                }
+              } catch (error) {
+                console.error('Error refreshing jobs:', error)
+              }
+            }
+            refreshJobs()
           } else if (job.status === 'processing' || job.status === 'pending') {
             // Continue polling
             setTimeout(poll, 3000)
@@ -117,32 +173,12 @@ export default function VerifyPage() {
     }
     
     poll()
-  }
+  }, [])
 
-  // Load user's bulk verification jobs
-  const loadUserJobs = async () => {
-    try {
-      const response = await fetch('/api/bulk-verify/jobs')
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      const data = await response.json()
-      
-      if (data.jobs) {
-        setAllJobs(data.jobs)
-        
-        // Check if there's an active job
-        const activeJob = data.jobs.find((job: BulkVerificationJob) => job.status === 'processing' || job.status === 'pending')
-        if (activeJob && !currentJob) {
-          setCurrentJob(activeJob)
-          setIsProcessing(true)
-          pollJobStatus(activeJob.jobId)
-        }
-      }
-    } catch (error) {
-      console.error('Error loading user jobs:', error)
-    }
-  }
+  // Assign pollJobStatus to ref to avoid circular dependency
+  pollJobStatusRef.current = pollJobStatus
+
+
 
   // Load jobs on component mount
   useEffect(() => {

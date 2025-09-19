@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     let body: FindEmailApiRequest
     try {
       body = await request.json()
-    } catch (error) {
+    } catch {
       return createApiErrorResponse('Invalid JSON in request body', 400)
     }
 

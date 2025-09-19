@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -28,7 +28,7 @@ export function EnvChecker() {
   const [isLoading, setIsLoading] = useState(true)
   const [lastChecked, setLastChecked] = useState<Date | null>(null)
 
-  const envVariables: EnvVariable[] = [
+  const envVariables: EnvVariable[] = useMemo(() => [
     // Supabase Configuration
     {
       name: 'NEXT_PUBLIC_SUPABASE_URL',
@@ -145,9 +145,9 @@ export function EnvChecker() {
       description: 'Marketing website URL',
       category: 'app'
     }
-  ]
+  ], [])
 
-  const checkEnvironmentVariables = () => {
+  const checkEnvironmentVariables = useCallback(() => {
     setIsLoading(true)
     
     const status: EnvStatus[] = envVariables.map(envVar => {
@@ -176,11 +176,11 @@ export function EnvChecker() {
     setEnvStatus(status)
     setLastChecked(new Date())
     setIsLoading(false)
-  }
+  }, [envVariables])
 
   useEffect(() => {
     checkEnvironmentVariables()
-  }, [])
+  }, [checkEnvironmentVariables])
 
   const getStatusIcon = (status: string, required: boolean) => {
     if (status === 'present') {
