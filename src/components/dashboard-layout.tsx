@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -139,9 +140,11 @@ export function DashboardLayout({ children, userProfile }: DashboardLayoutProps)
           {/* Logo */}
           <div className="relative flex h-16 items-center justify-center px-6 border-b">
             <Link href="/find" className="flex items-center">
-              <img 
+              <Image 
                 src="/Mailsfinder black - Fav (1).png" 
                 alt="MailsFinder Logo" 
+                width={100}
+                height={25}
                 className="h-25 w-auto"
               />
             </Link>

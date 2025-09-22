@@ -183,7 +183,7 @@ export async function processJobInBackground(jobId: string) {
         }
         
         // Deduct 1 credit (prefer find credits first)
-        let updateData: any = { updated_at: new Date().toISOString() }
+        const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
         
         if (currentFindCredits > 0) {
           updateData.credits_find = currentFindCredits - 1

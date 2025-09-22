@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -92,7 +92,7 @@ export default function BulkFinderPage() {
 
       return () => clearInterval(interval)
     }
-  }, [currentJob])
+  }, [currentJob, invalidateCreditsData])
 
   const loadUserJobs = async () => {
     try {

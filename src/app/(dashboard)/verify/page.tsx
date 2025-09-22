@@ -142,7 +142,7 @@ export default function VerifyPage() {
     } catch (error) {
       console.error('Error loading user jobs:', error)
     }
-  }, [currentJob, pollJobStatus])
+  }, [currentJob, pollJobStatus, setAllJobs, setCurrentJob, setIsProcessing])
 
   // Load jobs on component mount
   useEffect(() => {

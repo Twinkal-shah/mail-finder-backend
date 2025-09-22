@@ -149,7 +149,7 @@ async function processJob(jobId: string) {
          }
          
          // Deduct 1 credit (prefer verify credits first)
-          let updateData: any = { updated_at: new Date().toISOString() }
+          const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
           
           if (currentVerifyCredits >= 1) {
             updateData.credits_verify = currentVerifyCredits - 1
