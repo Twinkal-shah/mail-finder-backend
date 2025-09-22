@@ -37,7 +37,7 @@ async function createSupabaseClient() {
 /**
  * Submit requests for bulk email finding as a background job
  */
-export async function submitBulkFinderJob(requests: BulkFindRequest[]): Promise<{ success: boolean; jobId?: string; error?: string }> {
+export async function submitBulkFinderJob(requests: BulkFindRequest[], filename?: string): Promise<{ success: boolean; jobId?: string; error?: string }> {
   try {
     if (!requests || !Array.isArray(requests) || requests.length === 0) {
       return {
@@ -111,7 +111,8 @@ export async function submitBulkFinderJob(requests: BulkFindRequest[]): Promise<
         processed_requests: 0,
         successful_finds: 0,
         failed_finds: 0,
-        requests_data: requests.map(request => ({ ...request, status: 'pending' }))
+        requests_data: requests.map(request => ({ ...request, status: 'pending' })),
+        filename: filename
       })
 
     if (insertError) {

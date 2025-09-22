@@ -14,6 +14,7 @@ export interface BulkVerificationJob {
   failedVerifications?: number
   emailsData?: EmailData[]
   errorMessage?: string
+  filename?: string
   createdAt?: string
   updatedAt?: string
   completedAt?: string

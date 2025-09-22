@@ -248,13 +248,18 @@ export async function createLemonSqueezyPortal() {
     throw new Error('User not authenticated')
   }
   
-  // Get user's customer ID from the database
+  // Get user's profile including plan information
   const supabase = await createServerActionClient()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('lemonsqueezy_customer_id')
+    .select('lemonsqueezy_customer_id, plan')
     .eq('id', user.id)
     .single()
+  
+  // Check if user is on free plan
+  if (profile?.plan === 'free') {
+    throw new Error('You are currently on the Free Plan. Billing management is available only on paid plans. 👉 Upgrade to our Agency or Lifetime plan to unlock billing and advanced features.')
+  }
   
   let customerId = profile?.lemonsqueezy_customer_id
   

@@ -137,14 +137,18 @@ export function DashboardLayout({ children, userProfile }: DashboardLayoutProps)
       >
         <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="flex h-16 items-center justify-between px-6 border-b">
-            <Link href="/find" className="text-xl font-bold text-gray-900">
-              MailsFinder
+          <div className="relative flex h-16 items-center justify-center px-6 border-b">
+            <Link href="/find" className="flex items-center">
+              <img 
+                src="/Mailsfinder black - Fav (1).png" 
+                alt="MailsFinder Logo" 
+                className="h-25 w-auto"
+              />
             </Link>
             <Button
               variant="ghost"
               size="sm"
-              className="lg:hidden"
+              className="absolute right-6 lg:hidden"
               onClick={() => setSidebarOpen(false)}
             >
               <X className="h-5 w-5" />

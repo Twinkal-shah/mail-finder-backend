@@ -297,6 +297,7 @@ export interface Database {
           emails_data: Record<string, unknown>
           current_index: number
           error_message: string | null
+          filename: string | null
           created_at: string
           updated_at: string
           completed_at: string | null
@@ -312,6 +313,7 @@ export interface Database {
           emails_data: Record<string, unknown>
           current_index?: number
           error_message?: string | null
+          filename?: string | null
           created_at?: string
           updated_at?: string
           completed_at?: string | null
@@ -327,6 +329,7 @@ export interface Database {
           emails_data?: Record<string, unknown>
           current_index?: number
           error_message?: string | null
+          filename?: string | null
           created_at?: string
           updated_at?: string
           completed_at?: string | null
@@ -344,6 +347,7 @@ export interface Database {
           requests_data: Record<string, unknown>
           current_index: number
           error_message: string | null
+          filename: string | null
           created_at: string
           updated_at: string
           completed_at: string | null
@@ -359,6 +363,7 @@ export interface Database {
           requests_data: Record<string, unknown>
           current_index?: number
           error_message?: string | null
+          filename?: string | null
           created_at?: string
           updated_at?: string
           completed_at?: string | null
@@ -374,6 +379,7 @@ export interface Database {
           requests_data?: Record<string, unknown>
           current_index?: number
           error_message?: string | null
+          filename?: string | null
           created_at?: string
           updated_at?: string
           completed_at?: string | null

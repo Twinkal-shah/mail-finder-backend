@@ -288,7 +288,7 @@ export default function VerifyPage() {
 
     try {
       const emails = validRows.map(row => row.email)
-      const result = await submitBulkVerificationJob(emails)
+      const result = await submitBulkVerificationJob(emails, originalFileName)
       
       if (result.success && result.jobId) {
         toast.success('Bulk verification job submitted! Processing in background...')
@@ -602,7 +602,10 @@ export default function VerifyPage() {
                        const link = document.createElement('a')
                        const url = URL.createObjectURL(blob)
                        link.setAttribute('href', url)
-                       link.setAttribute('download', `bulk_verification_results_${currentJob.jobId}.csv`)
+                       const downloadFileName = currentJob.filename 
+                         ? `result-${currentJob.filename.replace(/\.[^/.]+$/, '')}.csv`
+                         : `bulk_verification_results_${currentJob.jobId}.csv`
+                       link.setAttribute('download', downloadFileName)
                        link.style.visibility = 'hidden'
                        document.body.appendChild(link)
                        link.click()
@@ -625,7 +628,10 @@ export default function VerifyPage() {
                        const link = document.createElement('a')
                        const url = URL.createObjectURL(blob)
                        link.setAttribute('href', url)
-                       link.setAttribute('download', `partial_verification_results_${currentJob.jobId}.csv`)
+                       const downloadFileName = currentJob.filename 
+                         ? `result-${currentJob.filename.replace(/\.[^/.]+$/, '')}.csv`
+                         : `partial_verification_results_${currentJob.jobId}.csv`
+                       link.setAttribute('download', downloadFileName)
                        link.style.visibility = 'hidden'
                        document.body.appendChild(link)
                        link.click()
@@ -673,7 +679,7 @@ export default function VerifyPage() {
                        <AlertCircle className="h-4 w-4 text-red-600" />
                      )}
                      <div>
-                       <p className="font-medium">Job {job.jobId}</p>
+                       <p className="font-medium">{job.filename || `Job ${job.jobId}`}</p>
                        <p className="text-sm text-gray-600">
                          {job.processedEmails || 0} / {job.totalEmails} emails • {job.status}
                        </p>
@@ -693,7 +699,10 @@ export default function VerifyPage() {
                            const link = document.createElement('a')
                            const url = URL.createObjectURL(blob)
                            link.setAttribute('href', url)
-                           link.setAttribute('download', `bulk_verification_results_${job.jobId}.csv`)
+                           const downloadFileName = job.filename 
+                             ? `result-${job.filename.replace(/\.[^/.]+$/, '')}.csv`
+                             : `bulk_verification_results_${job.jobId}.csv`
+                           link.setAttribute('download', downloadFileName)
                            link.style.visibility = 'hidden'
                            document.body.appendChild(link)
                            link.click()

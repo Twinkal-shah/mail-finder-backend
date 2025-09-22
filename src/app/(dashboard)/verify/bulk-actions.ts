@@ -24,7 +24,7 @@ async function createSupabaseClient() {
 /**
  * Submit emails for bulk verification as a background job
  */
-export async function submitBulkVerificationJob(emails: string[]): Promise<{
+export async function submitBulkVerificationJob(emails: string[], filename?: string): Promise<{
   success: boolean
   jobId?: string
   error?: string
@@ -100,7 +100,8 @@ export async function submitBulkVerificationJob(emails: string[]): Promise<{
         processed_emails: 0,
         successful_verifications: 0,
         failed_verifications: 0,
-        emails_data: emails.map(email => ({ email, status: 'pending' }))
+        emails_data: emails.map(email => ({ email, status: 'pending' })),
+        filename: filename
       })
 
     if (insertError) {

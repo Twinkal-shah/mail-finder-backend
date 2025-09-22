@@ -20,6 +20,7 @@ export interface BulkFinderJob {
   failedFinds?: number
   requestsData?: BulkFindRequest[]
   errorMessage?: string
+  filename?: string
   createdAt?: string
   updatedAt?: string
   completedAt?: string

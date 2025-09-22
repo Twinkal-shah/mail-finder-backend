@@ -13,7 +13,9 @@ export const metadata: Metadata = {
   title: "MailsFinder Dashboard",
   description: "Find and verify email addresses with MailsFinder",
   icons: {
-    icon: '/favicon.svg',
+    // icon: '/Mailsfinder black - Fav (1).png',
+    icon: '/Mailsfinder black - Fav (1).png',
+    
   },
 }
 

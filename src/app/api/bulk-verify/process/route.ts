@@ -92,48 +92,14 @@ async function processJob(jobId: string) {
     let failedCount = job.failed_verifications || 0
     const updatedEmailsData = [...emails]
 
-    // Process emails one by one
+    // Track total processed emails for final transaction
+    let totalProcessedEmails = 0
+
+    // Process emails one by one with progressive credit deduction
     for (let i = processedCount; i < emails.length; i++) {
       const emailData = emails[i]
       
       try {
-        // Check credits before processing each email
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('credits_find, credits_verify')
-          .eq('id', job.user_id)
-          .single()
-        
-        if (profileError || !profile) {
-          console.error(`Failed to get profile for credit check: ${emailData.email || emailData}`, profileError)
-          // Mark job as failed due to profile access error
-          await updateJobProgress(supabase, jobId, {
-            status: 'failed',
-            error_message: 'Failed to access user profile for credit verification',
-            updated_at: new Date().toISOString()
-          })
-          return
-        }
-        
-        const currentFindCredits = profile.credits_find || 0
-        const currentVerifyCredits = profile.credits_verify || 0
-        const totalCredits = currentFindCredits + currentVerifyCredits
-        
-        // Stop processing if no credits available
-        if (totalCredits < 1) {
-          console.log(`Stopping bulk verification - insufficient credits (${totalCredits} available)`)
-          // Mark job as failed with specific insufficient credits message
-          await updateJobProgress(supabase, jobId, {
-            status: 'failed',
-            error_message: 'You don\'t have enough credits to continue verification. Please purchase additional credits or upgrade your plan to proceed.',
-            processed_emails: processedCount,
-            successful_verifications: successfulCount,
-            failed_verifications: failedCount,
-            emails_data: updatedEmailsData,
-            updated_at: new Date().toISOString()
-          })
-          return
-        }
         
         // Verify the email - handle both emailData.email and emailData directly
         const emailToVerify = emailData.email || emailData
@@ -149,49 +115,66 @@ async function processJob(jobId: string) {
           user_name: result.user_name
         }
 
-        // Deduct credits for any verification attempt (including errors)
-         // User should be charged for every verification attempt made
-         try {
-           // Deduct from verify credits first, then find credits if needed
-           const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
-           
-           if (currentVerifyCredits >= 1) {
-             updateData.credits_verify = currentVerifyCredits - 1
-           } else {
-             updateData.credits_verify = 0
-             updateData.credits_find = currentFindCredits - 1
+        // Check and deduct credit for this email verification
+         const { data: userProfile, error: profileError } = await supabase
+           .from('profiles')
+           .select('credits_find, credits_verify')
+           .eq('id', job.user_id)
+           .single()
+         
+         if (profileError || !userProfile) {
+           console.error(`Error getting user profile for email ${emailToVerify}:`, profileError)
+           updatedEmailsData[i] = {
+             ...emailData,
+             status: 'error'
            }
-           
-           const { error: updateError } = await supabase
-             .from('profiles')
-             .update(updateData)
-             .eq('id', job.user_id)
-           
-           if (updateError) {
-             console.error(`Failed to deduct credit for email: ${emailToVerify}`, updateError)
-           } else {
-             console.log(`Successfully deducted 1 credit for email: ${emailToVerify}`)
-             
-             // Log the transaction
-             await supabase
-               .from('transactions')
-               .insert({
-                 user_id: job.user_id,
-                 product_type: 'email_verify',
-                 amount: 0, // No monetary amount for credit usage
-                 credits_find_added: -1, // Negative for credit deduction
-                 status: 'completed',
-                 metadata: {
-                   email: emailToVerify,
-                   domain: result.domain,
-                   result: result.status,
-                   bulk: true
-                 }
-               })
-           }
-         } catch (creditError) {
-           console.error(`Error deducting credit for email ${emailToVerify}:`, creditError)
+           failedCount++
+           processedCount++
+           continue
          }
+         
+         const currentFindCredits = userProfile.credits_find || 0
+         const currentVerifyCredits = userProfile.credits_verify || 0
+         const totalCredits = currentFindCredits + currentVerifyCredits
+         
+         if (totalCredits < 1) {
+           console.log(`Insufficient credits for email ${emailToVerify}`)
+           updatedEmailsData[i] = {
+             ...emailData,
+             status: 'error'
+           }
+           failedCount++
+           processedCount++
+           continue
+         }
+         
+         // Deduct 1 credit (prefer verify credits first)
+          let updateData: any = { updated_at: new Date().toISOString() }
+          
+          if (currentVerifyCredits >= 1) {
+            updateData.credits_verify = currentVerifyCredits - 1
+          } else {
+            updateData.credits_find = currentFindCredits - 1
+          }
+         
+         const { error: updateError } = await supabase
+           .from('profiles')
+           .update(updateData)
+           .eq('id', job.user_id)
+         
+         if (updateError) {
+           console.error(`Error deducting credit for email ${emailToVerify}:`, updateError)
+           updatedEmailsData[i] = {
+             ...emailData,
+             status: 'error'
+           }
+           failedCount++
+           processedCount++
+           continue
+         }
+         
+         totalProcessedEmails++
+        console.log(`Processing email ${i + 1}/${emails.length}: ${emailToVerify}`)
         
         // Count results based on verification status
         if (result.status === 'valid') {
@@ -229,7 +212,29 @@ async function processJob(jobId: string) {
       }
     }
 
-    // Credits are already deducted individually for each verified email above
+    // Log single bulk transaction for all processed emails
+    if (totalProcessedEmails > 0) {
+      const { error: transactionError } = await supabase
+        .from('credit_transactions')
+        .insert({
+          user_id: job.user_id,
+          amount: -totalProcessedEmails,
+          operation: 'email_verify',
+          meta: {
+            bulk: true,
+            job_id: jobId,
+            total_emails: totalProcessedEmails,
+            batch_operation: true
+          },
+          created_at: new Date().toISOString()
+        })
+      
+      if (transactionError) {
+        console.error('Error logging bulk credit transaction:', transactionError)
+      } else {
+        console.log(`Logged bulk transaction for ${totalProcessedEmails} credits`)
+      }
+    }
 
     // Mark job as completed
     await updateJobProgress(supabase, jobId, {

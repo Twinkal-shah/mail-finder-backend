@@ -54,6 +54,7 @@ export async function GET() {
       failedVerifications: job.failed_verifications,
       emailsData: job.emails_data,
       errorMessage: job.error_message,
+      filename: job.filename,
       createdAt: job.created_at,
       updatedAt: job.updated_at,
       completedAt: job.completed_at

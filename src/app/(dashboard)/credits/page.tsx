@@ -301,16 +301,14 @@ function CreditsPageComponent() {
       verifyCredits: 50000,
       popular: true,
       features: [
+        'Everything in pro plus',
         '50,000 email finding credits/month',
         '50,000 email verification credits/month',
-        'Everything in pro plus',
         'Full API Access',
         'Email enrichment automation workflow',
         'Lifetime Community support',
         'Whatsapp support',
-        'Monthly billing',
-        'Priority email support',
-        'Advanced analytics'
+        'Priority email support'
       ]
     },
     {
@@ -327,7 +325,6 @@ function CreditsPageComponent() {
         'Cold outbound automation support and implementation',
         'First 2 campaigns are on us with guaranteed deliverability',
         '1 year founder exclusive community access (for limited founders)',
-        'One-time payment',
         'Lifetime access',
         'Priority support',
         'All future features'

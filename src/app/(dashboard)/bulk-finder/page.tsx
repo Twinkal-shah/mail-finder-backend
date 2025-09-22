@@ -113,6 +113,7 @@ export default function BulkFinderPage() {
           failed_finds?: number;
           requests_data?: BulkFindRequest[];
           error_message?: string;
+          filename?: string;
           created_at?: string;
           updated_at?: string;
           completed_at?: string;
@@ -125,6 +126,7 @@ export default function BulkFinderPage() {
           failedFinds: job.failed_finds,
           requestsData: job.requests_data,
           errorMessage: job.error_message,
+          filename: job.filename,
           createdAt: job.created_at,
           updatedAt: job.updated_at
         }))
@@ -233,7 +235,7 @@ export default function BulkFinderPage() {
         role: row.role
       }))
 
-      const result = await submitBulkFinderJob(requests)
+      const result = await submitBulkFinderJob(requests, originalFileName || undefined)
       
       if (result.success && result.jobId) {
         toast.success('Bulk finder job submitted successfully!')
@@ -294,9 +296,9 @@ export default function BulkFinderPage() {
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    // Use original filename if available, otherwise use default
-    const downloadFileName = originalFileName 
-      ? `${originalFileName}.csv` 
+    // Use original filename with 'result-' prefix if available, otherwise use default
+    const downloadFileName = job.filename 
+      ? `result-${job.filename.replace(/\.[^/.]+$/, '')}.csv` 
       : `bulk_finder_results_${job.jobId}.csv`
     a.download = downloadFileName
     document.body.appendChild(a)
@@ -442,7 +444,7 @@ export default function BulkFinderPage() {
                     
                     <div>
                       <p className="font-medium">
-                        {job.totalRequests} requests • {job.status}
+                        {job.filename || `${job.totalRequests} requests`} • {job.status}
                       </p>
                       <p className="text-sm text-gray-600">
                         {job.createdAt && new Date(job.createdAt).toLocaleString()}

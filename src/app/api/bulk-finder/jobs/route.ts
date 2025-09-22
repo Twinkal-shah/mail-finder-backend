@@ -125,7 +125,10 @@ export async function processJobInBackground(jobId: string) {
     let failedCount = job.failed_finds || 0
     const startIndex = job.current_index || 0
 
-    // Process each request starting from current_index
+    // Track total processed requests for final transaction
+    let totalProcessedRequests = 0
+
+    // Process each request starting from current_index (credits already deducted)
     for (let i = startIndex; i < requests.length; i++) {
       try {
         // Check if job was paused/stopped
@@ -152,6 +155,58 @@ export async function processJobInBackground(jobId: string) {
           })
           .eq('id', jobId)
 
+        // Check if user has credits before processing
+        const { data: userProfile, error: profileError } = await supabase
+          .from('profiles')
+          .select('credits_find, credits_verify')
+          .eq('id', job.user_id)
+          .single()
+        
+        if (profileError || !userProfile) {
+          console.error('Error getting user profile:', profileError)
+          request.status = 'failed'
+          request.error = 'Failed to access user profile'
+          failedCount++
+          continue
+        }
+        
+        const currentFindCredits = userProfile.credits_find || 0
+        const currentVerifyCredits = userProfile.credits_verify || 0
+        const totalCredits = currentFindCredits + currentVerifyCredits
+        
+        if (totalCredits < 1) {
+          console.log('User has insufficient credits')
+          request.status = 'failed'
+          request.error = 'Insufficient credits'
+          failedCount++
+          continue
+        }
+        
+        // Deduct 1 credit (prefer find credits first)
+        let updateData: any = { updated_at: new Date().toISOString() }
+        
+        if (currentFindCredits > 0) {
+          updateData.credits_find = currentFindCredits - 1
+        } else {
+          updateData.credits_verify = currentVerifyCredits - 1
+        }
+        
+        // Update user credits
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update(updateData)
+          .eq('id', job.user_id)
+        
+        if (updateError) {
+          console.error('Error deducting credit:', updateError)
+          request.status = 'failed'
+          request.error = 'Failed to deduct credit'
+          failedCount++
+          continue
+        }
+        
+        totalProcessedRequests++
+
         // Find email
         const result = await findEmail({
           full_name: request.full_name,
@@ -173,31 +228,7 @@ export async function processJobInBackground(jobId: string) {
           failedCount++
         }
 
-        // Deduct 1 credit for this processed row using the proper function
-        try {
-          const { data: deductResult, error: deductError } = await supabase
-            .rpc('deduct_credits', {
-              required: 1,
-              operation: 'email_find',
-              meta: {
-                bulk: true,
-                job_id: jobId,
-                row_index: i,
-                email_found: result.status === 'valid'
-              }
-            })
-          
-          if (deductError) {
-            console.error(`Failed to deduct credit for row ${i}:`, deductError)
-          } else if (!deductResult) {
-            console.log(`⚠️ Credit deduction failed for row ${i}, user: ${job.user_id} - insufficient credits`)
-          } else {
-            console.log(`✅ Successfully deducted 1 credit for row ${i}`)
-          }
-        } catch (error) {
-          console.error(`Failed to deduct credit for row ${i}:`, error)
-          // Continue processing even if credit deduction fails
-        }
+        console.log(`Processing request ${i + 1}/${requests.length}: ${request.full_name}@${request.domain}`)
 
         processedCount++
 
@@ -242,6 +273,31 @@ export async function processJobInBackground(jobId: string) {
         if (errorUpdateError) {
           console.error(`Error updating job after processing error for job ${jobId}:`, errorUpdateError)
         }
+      }
+    }
+
+    // Log single bulk transaction for all processed requests
+    if (totalProcessedRequests > 0) {
+      const { error: transactionError } = await supabase
+        .from('credit_transactions')
+        .insert({
+          user_id: job.user_id,
+          amount: -totalProcessedRequests,
+          operation: 'email_find',
+          meta: {
+            bulk: true,
+            job_id: jobId,
+            total_requests: totalProcessedRequests,
+            batch_operation: true
+          },
+          created_at: new Date().toISOString()
+        })
+      
+      if (transactionError) {
+        console.error('Error logging bulk credit transaction:', transactionError)
+        // Continue even if transaction logging fails
+      } else {
+        console.log(`Logged bulk credit transaction for ${totalProcessedRequests} credits`)
       }
     }
 
