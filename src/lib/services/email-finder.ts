@@ -67,52 +67,80 @@ export async function findEmailMock(request: EmailFinderRequest): Promise<EmailF
 }
 
 /**
- * Real email finder function using external API
+ * Real email finder function using external API with timeout and retry logic
  */
 export async function findEmailReal(request: EmailFinderRequest): Promise<EmailFinderResult> {
   const apiUrl = 'http://173.249.7.231:8500'
+  const maxRetries = 3
+  const timeoutMs = 30000 // 30 seconds timeout
   
-  try {
-    const response = await fetch(`${apiUrl}/find`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        names: [request.full_name],
-        domain: request.domain
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Create AbortController for timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+      
+      const response = await fetch(`${apiUrl}/find`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          names: [request.full_name],
+          domain: request.domain
+        }),
+        signal: controller.signal
       })
-    })
-    
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.status}`)
+      
+      clearTimeout(timeoutId)
+      
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      
+      // Map API response to our interface
+      // API returns: { email, status, message, connections, domain, mx, etc. }
+      return {
+        email: data.email || null,
+        confidence: data.confidence || (data.status === 'valid' ? 95 : 0),
+        status: data.status || 'invalid',
+        message: data.message || 'Email search completed',
+        catch_all: data.catch_all, // Use actual API value, don't default to false
+        connections: data.connections,
+        domain: data.domain,
+        mx: data.mx,
+        time_exec: data.time_exec,
+        user_name: data.user_name,
+        ver_ops: data.ver_ops
+      }
+    } catch (error) {
+      console.error(`Email finder API error (attempt ${attempt}/${maxRetries}):`, error)
+      
+      // If this is the last attempt, return error result
+      if (attempt === maxRetries) {
+        return {
+          email: null,
+          confidence: 0,
+          status: 'error',
+          message: error instanceof Error && error.name === 'AbortError' 
+            ? 'Request timed out after 30 seconds'
+            : 'Failed to find email due to API error'
+        }
+      }
+      
+      // Wait before retrying (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000))
     }
-    
-    const data = await response.json()
-    
-    // Map API response to our interface
-    // API returns: { email, status, message, connections, domain, mx, etc. }
-    return {
-      email: data.email || null,
-      confidence: data.confidence || (data.status === 'valid' ? 95 : 0),
-      status: data.status || 'invalid',
-      message: data.message || 'Email search completed',
-      catch_all: data.catch_all, // Use actual API value, don't default to false
-      connections: data.connections,
-      domain: data.domain,
-      mx: data.mx,
-      time_exec: data.time_exec,
-      user_name: data.user_name,
-      ver_ops: data.ver_ops
-    }
-  } catch (error) {
-    console.error('Email finder API error:', error)
-    return {
-      email: null,
-      confidence: 0,
-      status: 'error',
-      message: 'Failed to find email due to API error'
-    }
+  }
+  
+  // This should never be reached, but just in case
+  return {
+    email: null,
+    confidence: 0,
+    status: 'error',
+    message: 'Failed to find email after all retry attempts'
   }
 }
 

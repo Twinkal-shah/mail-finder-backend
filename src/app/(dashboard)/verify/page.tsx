@@ -14,7 +14,7 @@ import { submitBulkVerificationJob, getBulkVerificationJobStatus, stopBulkVerifi
 import type { BulkVerificationJob } from './types'
 import { useQueryInvalidation } from '@/lib/query-invalidation'
 
-interface VerifyRow {
+interface VerifyRow extends CsvRow {
   id: number
   email: string
   status: 'pending' | 'processing' | 'valid' | 'invalid' | 'risky' | 'error' | 'unknown'
@@ -49,6 +49,7 @@ export default function VerifyPage() {
   const [processedCount, setProcessedCount] = useState(0)
   const [currentJob, setCurrentJob] = useState<BulkVerificationJob | null>(null)
   const [originalFileName, setOriginalFileName] = useState<string>('')
+  const [originalColumnOrder, setOriginalColumnOrder] = useState<string[]>([])
   const [allJobs, setAllJobs] = useState<BulkVerificationJob[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { invalidateCreditsData } = useQueryInvalidation()
@@ -224,13 +225,22 @@ export default function VerifyPage() {
       Papa.parse(file, {
         header: true,
         complete: (results) => {
+          // Store original column order from CSV headers
+          const originalColumns = results.meta?.fields || []
+          setOriginalColumnOrder(originalColumns)
+          
           const newRows: VerifyRow[] = (results.data as CsvRow[])
             .filter((row: CsvRow) => row['Email'] || row['email'])
-            .map((row: CsvRow, index: number) => ({
-              id: index,
-              email: row['Email'] || row['email'] || '',
-              status: 'pending' as const,
-            }))
+            .map((row: CsvRow, index: number) => {
+              const emailValue = row['Email'] || row['email'] || ''
+              // Preserve all original columns and add our required fields
+              return {
+                id: index,
+                email: emailValue,
+                status: 'pending' as const,
+                ...row // Spread all original columns
+              }
+            })
           
           setRows(newRows)
           toast.success(`Loaded ${newRows.length} emails from CSV`)
@@ -250,13 +260,24 @@ export default function VerifyPage() {
           const worksheet = workbook.Sheets[sheetName]
           const jsonData = XLSX.utils.sheet_to_json(worksheet)
           
+          // Store original column order from Excel headers
+          if (jsonData.length > 0) {
+            const originalColumns = Object.keys(jsonData[0] as object)
+            setOriginalColumnOrder(originalColumns)
+          }
+          
           const newRows: VerifyRow[] = (jsonData as CsvRow[])
             .filter((row: CsvRow) => row['Email'] || row['email'])
-            .map((row: CsvRow, index: number) => ({
-              id: index,
-              email: row['Email'] || row['email'] || '',
-              status: 'pending' as const,
-            }))
+            .map((row: CsvRow, index: number) => {
+              const emailValue = row['Email'] || row['email'] || ''
+              // Preserve all original columns and add our required fields
+              return {
+                id: index,
+                email: emailValue,
+                status: 'pending' as const,
+                ...row // Spread all original columns
+              }
+            })
           
           setRows(newRows)
           toast.success(`Loaded ${newRows.length} emails from Excel`)
@@ -287,8 +308,13 @@ export default function VerifyPage() {
     // setIsSubmittingJob(true) // Currently unused
 
     try {
-      const emails = validRows.map(row => row.email)
-      const result = await submitBulkVerificationJob(emails, originalFileName)
+      // Pass the full row data including all original columns
+      const emailsData = validRows.map(row => {
+        // Remove the id field and keep all other original columns
+        const { id, ...rowData } = row
+        return rowData
+      })
+      const result = await submitBulkVerificationJob(emailsData, originalFileName)
       
       if (result.success && result.jobId) {
         toast.success('Bulk verification job submitted! Processing in background...')
@@ -297,7 +323,7 @@ export default function VerifyPage() {
         const newJob: BulkVerificationJob = {
           jobId: result.jobId,
           status: 'pending',
-          totalEmails: emails.length,
+          totalEmails: emailsData.length,
           processedEmails: 0,
           successfulVerifications: 0,
           failedVerifications: 0
@@ -321,7 +347,30 @@ export default function VerifyPage() {
 
   const exportToCsv = async () => {
     try {
-      const csvData = Papa.unparse(rows)
+      // Define verification result columns to append
+      const verificationColumns = ['status', 'catch_all', 'domain', 'mx', 'user_name']
+      
+      // Create ordered columns: original columns first, then verification results
+      const orderedColumns = [...originalColumnOrder, ...verificationColumns]
+      
+      // Prepare data with proper column ordering
+      const exportData = rows.map(row => {
+        const orderedRow: Record<string, unknown> = {}
+        
+        // Add original columns in their original order
+        originalColumnOrder.forEach(col => {
+          orderedRow[col] = row[col as keyof VerifyRow]
+        })
+        
+        // Add verification result columns
+        verificationColumns.forEach(col => {
+          orderedRow[col] = row[col as keyof VerifyRow]
+        })
+        
+        return orderedRow
+      })
+      
+      const csvData = Papa.unparse(exportData, { columns: orderedColumns })
       const blob = new Blob([csvData], { type: 'text/csv' })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -597,7 +646,20 @@ export default function VerifyPage() {
                 <div className="text-center">
                   <Button
                     onClick={() => {
-                       const csvContent = Papa.unparse(currentJob.emailsData || [])
+                       // Define verification result columns that should be appended
+                       const verificationResultColumns = ['status', 'catch_all', 'domain', 'mx', 'user_name']
+                       
+                       // Use stored original column order or extract from first row
+                       const columnsToUse = originalColumnOrder.length > 0 
+                         ? originalColumnOrder 
+                         : (currentJob.emailsData && currentJob.emailsData.length > 0 ? Object.keys(currentJob.emailsData[0]).filter(key => 
+                             !['status', 'catch_all', 'domain', 'mx', 'user_name'].includes(key)
+                           ) : [])
+                       
+                       // Create ordered columns array: original columns + verification result columns
+                       const orderedColumns = [...columnsToUse, ...verificationResultColumns]
+                       
+                       const csvContent = Papa.unparse(currentJob.emailsData || [], { columns: orderedColumns })
                        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
                        const link = document.createElement('a')
                        const url = URL.createObjectURL(blob)
@@ -623,7 +685,20 @@ export default function VerifyPage() {
                 <div className="text-center">
                   <Button
                     onClick={() => {
-                       const csvContent = Papa.unparse(currentJob.emailsData || [])
+                       // Define verification result columns that should be appended
+                       const verificationResultColumns = ['status', 'catch_all', 'domain', 'mx', 'user_name']
+                       
+                       // Use stored original column order or extract from first row
+                       const columnsToUse = originalColumnOrder.length > 0 
+                         ? originalColumnOrder 
+                         : (currentJob.emailsData && currentJob.emailsData.length > 0 ? Object.keys(currentJob.emailsData[0]).filter(key => 
+                             !['status', 'catch_all', 'domain', 'mx', 'user_name'].includes(key)
+                           ) : [])
+                       
+                       // Create ordered columns array: original columns + verification result columns
+                       const orderedColumns = [...columnsToUse, ...verificationResultColumns]
+                       
+                       const csvContent = Papa.unparse(currentJob.emailsData || [], { columns: orderedColumns })
                        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
                        const link = document.createElement('a')
                        const url = URL.createObjectURL(blob)
@@ -694,7 +769,37 @@ export default function VerifyPage() {
                          size="sm"
                          variant="outline"
                          onClick={() => {
-                           const csvContent = Papa.unparse(job.emailsData || [])
+                           // Define verification result columns to append
+                           const verificationColumns = ['status', 'catch_all', 'domain', 'mx', 'user_name']
+                           
+                           // Use stored original column order if available, otherwise extract from first row
+                           let columnsToUse = originalColumnOrder
+                           if (columnsToUse.length === 0 && job.emailsData && job.emailsData.length > 0) {
+                             const firstRow = job.emailsData[0]
+                             columnsToUse = Object.keys(firstRow).filter(key => !verificationColumns.includes(key))
+                           }
+                           
+                           // Create ordered columns: original columns first, then verification results
+                           const orderedColumns = [...columnsToUse, ...verificationColumns]
+                           
+                           // Prepare data with proper column ordering
+                           const exportData = (job.emailsData || []).map((row: any) => {
+                             const orderedRow: Record<string, unknown> = {}
+                             
+                             // Add original columns in their original order
+                             columnsToUse.forEach(col => {
+                               orderedRow[col] = row[col]
+                             })
+                             
+                             // Add verification result columns
+                             verificationColumns.forEach(col => {
+                               orderedRow[col] = row[col]
+                             })
+                             
+                             return orderedRow
+                           })
+                           
+                           const csvContent = Papa.unparse(exportData, { columns: orderedColumns })
                            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
                            const link = document.createElement('a')
                            const url = URL.createObjectURL(blob)

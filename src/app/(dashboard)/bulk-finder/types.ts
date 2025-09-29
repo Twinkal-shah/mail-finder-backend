@@ -9,6 +9,7 @@ export interface BulkFindRequest {
   user_name?: string
   mx?: string
   error?: string
+  [key: string]: unknown // Allow additional fields from original CSV
 }
 
 export interface BulkFinderJob {

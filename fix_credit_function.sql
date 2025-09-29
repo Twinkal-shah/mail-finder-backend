@@ -1,14 +1,6 @@
--- Comprehensive fix for credit sync issues
--- This migration addresses:
--- 1. Parameter name mismatch (required vs amount)
--- 2. Bulk deduction causing -2 transactions
--- 3. Ensures consistent credit tracking
+-- Direct SQL script to fix the deduct_credits function
+-- Run this script directly in your Supabase SQL editor
 
--- Drop existing function to recreate with correct signature
-DROP FUNCTION IF EXISTS public.deduct_credits(INTEGER, TEXT, JSONB);
-DROP FUNCTION IF EXISTS public.deduct_credits(TEXT, INTEGER);
-
--- Create the function with 'required' parameter to match application calls
 CREATE OR REPLACE FUNCTION public.deduct_credits(
   required INTEGER,
   operation TEXT,
@@ -47,7 +39,6 @@ BEGIN
   -- Set deduction amount (always equals required for proper tracking)
   deduction_amount := required;
 
-  -- Determine deduction strategy based on operation
   IF operation = 'email_find' THEN
     -- Deduct from find credits first, then verify credits
     IF user_credits_find >= required THEN
@@ -101,7 +92,7 @@ $$;
 -- Grant permissions
 GRANT EXECUTE ON FUNCTION public.deduct_credits(INTEGER, TEXT, JSONB) TO authenticated;
 
--- Create a helper function to check if bulk operations should deduct per-row
+-- Update the bulk safe function as well
 CREATE OR REPLACE FUNCTION public.deduct_credits_bulk_safe(
   required INTEGER,
   operation TEXT,
@@ -127,22 +118,6 @@ $$;
 -- Grant permissions for bulk safe function
 GRANT EXECUTE ON FUNCTION public.deduct_credits_bulk_safe(INTEGER, TEXT, JSONB) TO authenticated;
 
--- Add a comment explaining the fix
+-- Add comment explaining the fix
 COMMENT ON FUNCTION public.deduct_credits(INTEGER, TEXT, JSONB) IS 
-'Fixed credit deduction function that matches application parameter names (required) and ensures proper transaction logging';
-
-COMMENT ON FUNCTION public.deduct_credits_bulk_safe(INTEGER, TEXT, JSONB) IS 
-'Bulk-safe credit deduction that prevents multiple credit deductions in a single transaction';
-
--- Create an index on credit_transactions for better performance
-CREATE INDEX IF NOT EXISTS idx_credit_transactions_user_operation 
-ON credit_transactions(user_id, operation, created_at DESC);
-
--- Add constraint to prevent excessive negative amounts (safety measure)
--- Drop existing constraint if it exists, then recreate
-ALTER TABLE credit_transactions 
-DROP CONSTRAINT IF EXISTS check_reasonable_deduction;
-
-ALTER TABLE credit_transactions 
-ADD CONSTRAINT check_reasonable_deduction 
-CHECK (amount >= -50000 OR amount > 0);
+'Fixed credit deduction function that properly logs transactions in credit_transactions table';

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { getCurrentUser, isPlanExpired } from '@/lib/auth'
+import { recoverStuckJobs } from '@/lib/bulk-finder-processor'
 import type { BulkFinderJob, BulkFindRequest } from './types.js'
 
 interface DatabaseJob {
@@ -124,8 +125,8 @@ export async function submitBulkFinderJob(requests: BulkFindRequest[], filename?
 
     // Trigger background processing directly
     try {
-      // Import and call the background processing function directly
-      const { processJobInBackground } = await import('@/app/api/bulk-finder/jobs/route')
+      // Import and call the background processing function from utility file
+      const { processJobInBackground } = await import('@/lib/bulk-finder-processor')
       
       // Start background processing without waiting for it to complete
       processJobInBackground(jobId).catch(async (error) => {
@@ -328,6 +329,26 @@ export async function stopBulkFinderJob(jobId: string): Promise<{
     return {
       success: false,
       error: 'Internal server error'
+    }
+  }
+}
+
+/**
+ * Recover stuck jobs that have been processing for too long
+ */
+export async function recoverStuckJobsAction(): Promise<{
+  success: boolean
+  error?: string
+}> {
+  try {
+    await recoverStuckJobs()
+    revalidatePath('/bulk-finder')
+    return { success: true }
+  } catch (error) {
+    console.error('Error recovering stuck jobs:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to recover stuck jobs'
     }
   }
 }

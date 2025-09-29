@@ -10,11 +10,120 @@ import { toast } from 'sonner'
 import { Upload, Download, Play, Users, Clock, CheckCircle, XCircle, Pause } from 'lucide-react'
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
-import { submitBulkFinderJob, getBulkFinderJobStatus, stopBulkFinderJob } from './bulk-finder-actions'
+import { submitBulkFinderJob, getBulkFinderJobStatus, stopBulkFinderJob, recoverStuckJobsAction } from './bulk-finder-actions'
 import type { BulkFinderJob, BulkFindRequest } from './types'
 import { useQueryInvalidation } from '@/lib/query-invalidation'
 
-interface BulkRow {
+interface CsvRow {
+  'Full Name'?: string
+  'Domain'?: string
+  'Role'?: string
+  [key: string]: unknown
+}
+
+// Utility function to find column mapping
+const findColumnMapping = (columns: string[]) => {
+  const mapping: { fullName?: string; domain?: string; role?: string } = {}
+  
+  // Patterns for full name columns
+  const fullNamePatterns = [
+    /^full\s*name$/i,
+    /^person\s*name$/i,
+    /^name$/i,
+    /^contact\s*name$/i,
+    /^employee\s*name$/i,
+    /^customer\s*name$/i,
+    /^client\s*name$/i,
+    /^lead\s*name$/i,
+    /^prospect\s*name$/i,
+    /^individual\s*name$/i
+  ]
+  
+  // Patterns for domain columns
+  const domainPatterns = [
+    /^domain$/i,
+    /^website\s*domain$/i,
+    /^company\s*domain$/i,
+    /^email\s*domain$/i,
+    /^website$/i,
+    /^company\s*website$/i,
+    /^url$/i,
+    /^site$/i,
+    /^web\s*address$/i,
+    /^company\s*url$/i,
+    /^organization\s*domain$/i,
+    /^business\s*domain$/i
+  ]
+  
+  // Patterns for role columns
+  const rolePatterns = [
+    /^role$/i,
+    /^position$/i,
+    /^title$/i,
+    /^job\s*title$/i,
+    /^designation$/i,
+    /^person\s*title$/i,
+    /^work\s*title$/i,
+    /^occupation$/i,
+    /^function$/i
+  ]
+  
+  // Find matching columns
+  for (const column of columns) {
+    if (!mapping.fullName && fullNamePatterns.some(pattern => pattern.test(column))) {
+      mapping.fullName = column
+    }
+    if (!mapping.domain && domainPatterns.some(pattern => pattern.test(column))) {
+      mapping.domain = column
+    }
+    if (!mapping.role && rolePatterns.some(pattern => pattern.test(column))) {
+      mapping.role = column
+    }
+  }
+  
+  // Check for first name + last name combination if no full name found
+  if (!mapping.fullName) {
+    const firstNamePatterns = [
+      /^first\s*name$/i,
+      /^person\s*first\s*name$/i,
+      /^fname$/i,
+      /^given\s*name$/i
+    ]
+    const lastNamePatterns = [
+      /^last\s*name$/i,
+      /^person\s*last\s*name$/i,
+      /^lname$/i,
+      /^surname$/i,
+      /^family\s*name$/i
+    ]
+    
+    const firstName = columns.find(col => firstNamePatterns.some(pattern => pattern.test(col)))
+    const lastName = columns.find(col => lastNamePatterns.some(pattern => pattern.test(col)))
+    
+    if (firstName && lastName) {
+      mapping.fullName = `${firstName}+${lastName}` // Special marker for combination
+    }
+  }
+  
+  return mapping
+}
+
+// Utility function to extract full name from row
+const extractFullName = (row: CsvRow, mapping: { fullName?: string }) => {
+  if (!mapping.fullName) return ''
+  
+  if (mapping.fullName.includes('+')) {
+    // Handle first name + last name combination
+    const [firstName, lastName] = mapping.fullName.split('+')
+    const first = (row[firstName] as string) || ''
+    const last = (row[lastName] as string) || ''
+    return `${first} ${last}`.trim()
+  }
+  
+  return (row[mapping.fullName] as string) || ''
+}
+
+interface BulkRow extends CsvRow {
   id: string
   fullName: string
   domain: string
@@ -28,24 +137,41 @@ interface BulkRow {
   error?: string
 }
 
-interface CsvRow {
-  'Full Name'?: string
-  'Domain'?: string
-  'Role'?: string
-}
-
 export default function BulkFinderPage() {
   const [rows, setRows] = useState<BulkRow[]>([])
   const [currentJob, setCurrentJob] = useState<BulkFinderJob | null>(null)
   const [jobHistory, setJobHistory] = useState<BulkFinderJob[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [originalFileName, setOriginalFileName] = useState<string | null>(null)
+  const [originalColumnOrder, setOriginalColumnOrder] = useState<string[]>([])
+  const [isInitialized, setIsInitialized] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { invalidateCreditsData } = useQueryInvalidation()
 
   // Load user jobs on component mount
   useEffect(() => {
-    loadUserJobs()
+    // Only run on client side to prevent hydration mismatch
+    if (typeof window === 'undefined') return
+    
+    // Initialize job persistence and load user jobs
+    const initializeAndLoad = async () => {
+      try {
+        // Initialize job persistence to resume any stuck jobs
+        const response = await fetch('/api/init-jobs', { method: 'POST' })
+        if (!response.ok) {
+          console.warn('Job persistence initialization failed, continuing without it')
+        }
+      } catch (error) {
+        console.error('Error initializing job persistence:', error)
+        // Continue without job persistence if it fails
+      }
+      
+      // Load user jobs
+      await loadUserJobs()
+      setIsInitialized(true)
+    }
+    
+    initializeAndLoad()
   }, [])
 
   // Poll current job status
@@ -96,6 +222,9 @@ export default function BulkFinderPage() {
 
   const loadUserJobs = async () => {
     try {
+      // First, attempt to recover any stuck jobs
+      await recoverStuckJobsAction()
+      
       const response = await fetch('/api/bulk-finder/jobs')
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -160,15 +289,38 @@ export default function BulkFinderPage() {
       Papa.parse(file, {
         header: true,
         complete: (results) => {
+          // Store original column order from CSV headers
+          const originalColumns = results.meta?.fields || []
+          setOriginalColumnOrder(originalColumns)
+          
+          // Find column mapping
+          const columnMapping = findColumnMapping(originalColumns)
+          
+          if (!columnMapping.fullName || !columnMapping.domain) {
+            toast.error('Could not find required columns. Please ensure your CSV has columns for full name and domain.')
+            return
+          }
+          
           const newRows: BulkRow[] = (results.data as CsvRow[])
-            .filter((row: CsvRow) => row['Full Name'] && row['Domain'])
-            .map((row: CsvRow, index: number) => ({
-              id: `row-${Date.now()}-${index}`,
-              fullName: row['Full Name'] || '',
-              domain: row['Domain'] || '',
-              role: row['Role'] || '',
-              status: 'pending' as const,
-            }))
+            .filter((row: CsvRow) => {
+              const fullName = extractFullName(row, columnMapping)
+              const domain = columnMapping.domain ? (row[columnMapping.domain] as string) : ''
+              return fullName && domain
+            })
+            .map((row: CsvRow, index: number) => {
+              const fullName = extractFullName(row, columnMapping)
+              const domain = columnMapping.domain ? (row[columnMapping.domain] as string) || '' : ''
+              const role = columnMapping.role ? (row[columnMapping.role] as string) || '' : ''
+              
+              return {
+                id: `row-${Date.now()}-${index}`,
+                fullName,
+                domain,
+                role,
+                status: 'pending' as const,
+                ...row // Preserve all original columns
+              }
+            })
           
           setRows(newRows)
           toast.success(`Loaded ${newRows.length} rows from CSV`)
@@ -188,15 +340,38 @@ export default function BulkFinderPage() {
           const worksheet = workbook.Sheets[sheetName]
           const jsonData = XLSX.utils.sheet_to_json(worksheet) as CsvRow[]
           
+          // Store original column order from Excel headers
+          const originalColumns = jsonData.length > 0 ? Object.keys(jsonData[0] as object) : []
+          setOriginalColumnOrder(originalColumns)
+          
+          // Find column mapping
+          const columnMapping = findColumnMapping(originalColumns)
+          
+          if (!columnMapping.fullName || !columnMapping.domain) {
+            toast.error('Could not find required columns. Please ensure your Excel file has columns for full name and domain.')
+            return
+          }
+          
           const newRows: BulkRow[] = jsonData
-            .filter((row: CsvRow) => row['Full Name'] && row['Domain'])
-            .map((row: CsvRow, index: number) => ({
-              id: `row-${Date.now()}-${index}`,
-              fullName: row['Full Name'] || '',
-              domain: row['Domain'] || '',
-              role: row['Role'] || '',
-              status: 'pending' as const,
-            }))
+            .filter((row: CsvRow) => {
+              const fullName = extractFullName(row, columnMapping)
+              const domain = columnMapping.domain ? (row[columnMapping.domain] as string) : ''
+              return fullName && domain
+            })
+            .map((row: CsvRow, index: number) => {
+              const fullName = extractFullName(row, columnMapping)
+              const domain = columnMapping.domain ? (row[columnMapping.domain] as string) || '' : ''
+              const role = columnMapping.role ? (row[columnMapping.role] as string) || '' : ''
+              
+              return {
+                id: `row-${Date.now()}-${index}`,
+                fullName,
+                domain,
+                role,
+                status: 'pending' as const,
+                ...row // Preserve all original columns
+              }
+            })
           
           setRows(newRows)
           toast.success(`Loaded ${newRows.length} rows from Excel`)
@@ -229,11 +404,16 @@ export default function BulkFinderPage() {
     setIsSubmitting(true)
 
     try {
-      const requests: BulkFindRequest[] = validRows.map(row => ({
-        full_name: row.fullName,
-        domain: row.domain,
-        role: row.role
-      }))
+      const requests: BulkFindRequest[] = validRows.map(row => {
+        // Remove the id field and keep all other original columns
+        const { id, fullName, domain, role, ...rowData } = row
+        return {
+          full_name: fullName,
+          domain: domain,
+          role: role,
+          ...rowData // Include all original CSV columns
+        }
+      })
 
       const result = await submitBulkFinderJob(requests, originalFileName || undefined)
       
@@ -278,20 +458,52 @@ export default function BulkFinderPage() {
   const downloadResults = (job: BulkFinderJob) => {
     if (!job.requestsData) return
 
-    const csvData = job.requestsData.map(req => ({
-      'Full Name': req.full_name,
-      'Domain': req.domain,
-      'Role': req.role || '',
-      'Email': req.email || '',
-      'Confidence': req.confidence || '',
-      'Status': req.status || '',
-      'Catch All': req.catch_all ? 'Yes' : 'No',
-      'User Name': req.user_name || '',
-      'MX': req.mx || '',
-      'Error': req.error || ''
-    }))
+    // Define the finder result columns that should be appended
+    const finderResultColumns = ['Email', 'Confidence', 'Status', 'Catch All', 'User Name', 'MX', 'Error']
+    
+    // Use stored original column order or extract from first row
+    const columnsToUse = originalColumnOrder.length > 0 
+      ? originalColumnOrder 
+      : (job.requestsData.length > 0 ? Object.keys(job.requestsData[0]).filter(key => 
+          !['email', 'confidence', 'status', 'catch_all', 'user_name', 'mx', 'error'].includes(key)
+        ) : [])
+    
+    // Create ordered columns array: original columns + finder result columns
+    const orderedColumns = [...columnsToUse, ...finderResultColumns]
 
-    const csv = Papa.unparse(csvData)
+    const csvData = job.requestsData.map(req => {
+      // Extract known fields and preserve all original columns
+      const { full_name, domain, role, email, confidence, status, catch_all, user_name, mx, error, ...originalColumns } = req
+      
+      // Create row data with original column names preserved
+      const rowData: Record<string, any> = {}
+      
+      // Add original columns first
+      columnsToUse.forEach(col => {
+        if (col === 'Full Name' || col === 'full_name') {
+          rowData[col] = full_name || originalColumns[col] || ''
+        } else if (col === 'Domain' || col === 'domain') {
+          rowData[col] = domain || originalColumns[col] || ''
+        } else if (col === 'Role' || col === 'role') {
+          rowData[col] = role || originalColumns[col] || ''
+        } else {
+          rowData[col] = originalColumns[col] || ''
+        }
+      })
+      
+      // Add finder result columns
+      rowData['Email'] = email || ''
+      rowData['Confidence'] = confidence || ''
+      rowData['Status'] = status || ''
+      rowData['Catch All'] = catch_all ? 'Yes' : 'No'
+      rowData['User Name'] = user_name || ''
+      rowData['MX'] = mx || ''
+      rowData['Error'] = error || ''
+      
+      return rowData
+    })
+
+    const csv = Papa.unparse(csvData, { columns: orderedColumns })
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')

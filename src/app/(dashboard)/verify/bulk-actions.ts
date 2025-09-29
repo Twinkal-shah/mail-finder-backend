@@ -22,18 +22,18 @@ async function createSupabaseClient() {
 }
 
 /**
- * Submit emails for bulk verification as a background job
+ * Submit email data for bulk verification as a background job
  */
-export async function submitBulkVerificationJob(emails: string[], filename?: string): Promise<{
+export async function submitBulkVerificationJob(emailsData: Array<{email: string, [key: string]: unknown}>, filename?: string): Promise<{
   success: boolean
   jobId?: string
   error?: string
 }> {
   try {
-    if (!emails || !Array.isArray(emails) || emails.length === 0) {
+    if (!emailsData || !Array.isArray(emailsData) || emailsData.length === 0) {
       return {
         success: false,
-        error: 'Invalid emails array'
+        error: 'Invalid emails data array'
       }
     }
 
@@ -70,7 +70,7 @@ export async function submitBulkVerificationJob(emails: string[], filename?: str
     }
     
     const availableCredits = profile.credits_verify || 0
-    const requiredCredits = emails.length
+    const requiredCredits = emailsData.length
     
     if (availableCredits === 0) {
       return {
@@ -96,11 +96,11 @@ export async function submitBulkVerificationJob(emails: string[], filename?: str
         id: jobId,
         user_id: user.id,
         status: 'pending',
-        total_emails: emails.length,
+        total_emails: emailsData.length,
         processed_emails: 0,
         successful_verifications: 0,
         failed_verifications: 0,
-        emails_data: emails.map(email => ({ email, status: 'pending' })),
+        emails_data: emailsData.map(data => ({ ...data, status: 'pending' })),
         filename: filename
       })
 
