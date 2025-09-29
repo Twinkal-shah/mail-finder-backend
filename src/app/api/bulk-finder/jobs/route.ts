@@ -3,7 +3,6 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { getCurrentUser } from '@/lib/auth'
 import { processJobInBackground } from '@/lib/bulk-finder-processor'
-import type { BulkFindRequest } from '@/app/(dashboard)/bulk-finder/types'
 
 async function createSupabaseClient() {
   const cookieStore = await cookies()

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -144,7 +144,6 @@ export default function BulkFinderPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [originalFileName, setOriginalFileName] = useState<string | null>(null)
   const [originalColumnOrder, setOriginalColumnOrder] = useState<string[]>([])
-  const [isInitialized, setIsInitialized] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { invalidateCreditsData } = useQueryInvalidation()
 
@@ -168,7 +167,6 @@ export default function BulkFinderPage() {
       
       // Load user jobs
       await loadUserJobs()
-      setIsInitialized(true)
     }
     
     initializeAndLoad()
@@ -406,7 +404,7 @@ export default function BulkFinderPage() {
     try {
       const requests: BulkFindRequest[] = validRows.map(row => {
         // Remove the id field and keep all other original columns
-        const { id, fullName, domain, role, ...rowData } = row
+        const { fullName, domain, role, ...rowData } = row
         return {
           full_name: fullName,
           domain: domain,
@@ -476,18 +474,18 @@ export default function BulkFinderPage() {
       const { full_name, domain, role, email, confidence, status, catch_all, user_name, mx, error, ...originalColumns } = req
       
       // Create row data with original column names preserved
-      const rowData: Record<string, any> = {}
+      const rowData: Record<string, string | number | boolean | null | undefined> = {}
       
       // Add original columns first
       columnsToUse.forEach(col => {
         if (col === 'Full Name' || col === 'full_name') {
-          rowData[col] = full_name || originalColumns[col] || ''
+          rowData[col] = full_name || (originalColumns[col] as string) || ''
         } else if (col === 'Domain' || col === 'domain') {
-          rowData[col] = domain || originalColumns[col] || ''
+          rowData[col] = domain || (originalColumns[col] as string) || ''
         } else if (col === 'Role' || col === 'role') {
-          rowData[col] = role || originalColumns[col] || ''
+          rowData[col] = role || (originalColumns[col] as string) || ''
         } else {
-          rowData[col] = originalColumns[col] || ''
+          rowData[col] = (originalColumns[col] as string) || ''
         }
       })
       

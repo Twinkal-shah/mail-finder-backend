@@ -11,7 +11,7 @@ import { Upload, Download, Play, Shield, AlertCircle, CheckCircle, Clock, Pause 
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 import { submitBulkVerificationJob, getBulkVerificationJobStatus, stopBulkVerificationJob } from './bulk-actions'
-import type { BulkVerificationJob } from './types'
+import type { BulkVerificationJob, EmailData } from './types'
 import { useQueryInvalidation } from '@/lib/query-invalidation'
 
 interface VerifyRow extends CsvRow {
@@ -311,7 +311,7 @@ export default function VerifyPage() {
       // Pass the full row data including all original columns
       const emailsData = validRows.map(row => {
         // Remove the id field and keep all other original columns
-        const { id, ...rowData } = row
+        const { ...rowData } = row
         return rowData
       })
       const result = await submitBulkVerificationJob(emailsData, originalFileName)
@@ -783,7 +783,7 @@ export default function VerifyPage() {
                            const orderedColumns = [...columnsToUse, ...verificationColumns]
                            
                            // Prepare data with proper column ordering
-                           const exportData = (job.emailsData || []).map((row: any) => {
+                           const exportData = (job.emailsData || []).map((row: EmailData) => {
                              const orderedRow: Record<string, unknown> = {}
                              
                              // Add original columns in their original order
