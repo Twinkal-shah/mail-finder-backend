@@ -21,7 +21,7 @@ export interface ApiResponse {
   status: number
   statusText: string
   headers: Record<string, string>
-  data: any
+  data: unknown
   duration: number // Request duration in milliseconds
 }
 

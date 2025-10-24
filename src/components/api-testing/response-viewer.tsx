@@ -50,7 +50,7 @@ export function ResponseViewer({ response, className }: ResponseViewerProps) {
     return 'bg-gray-500'
   }
 
-  const formatJson = (obj: any) => {
+  const formatJson = (obj: unknown) => {
     try {
       return JSON.stringify(obj, null, 2)
     } catch {

@@ -149,7 +149,7 @@ export async function processJobInBackground(jobId: string) {
       const batchEnd = Math.min(batchStart + BATCH_SIZE, requests.length)
       const batch = requests.slice(batchStart, batchEnd)
       
-      console.log(`Processing batch ${Math.floor(batchStart / BATCH_SIZE) + 1}: requests ${batchStart + 1}-${batchEnd} of ${requests.length}`)
+      console.log(`Processing batch ${Math.floor(batchStart / BATCH_SIZE) + 1}/${totalBatches}: requests ${batchStart + 1}-${batchEnd} of ${requests.length}`)
 
       // Save current progress before processing batch
       await supabase
