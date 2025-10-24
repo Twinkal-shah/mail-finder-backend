@@ -122,9 +122,12 @@ export async function processJobInBackground(jobId: string) {
 
     // Track total processed requests for final transaction
     let totalProcessedRequests = 0
-    const BATCH_SIZE = 10
+    const BATCH_SIZE = 5
+    const totalBatches = Math.ceil((requests.length - startIndex) / BATCH_SIZE)
+    
+    console.log(`Starting processing from index ${startIndex} (${requests.length - startIndex} remaining)`)
 
-    // Process requests in batches of 10
+    // Process requests in batches of 5
     for (let batchStart = startIndex; batchStart < requests.length; batchStart += BATCH_SIZE) {
       // Check if job was paused/stopped before processing each batch
       const { data: currentJob, error: statusError } = await supabase
@@ -148,12 +151,22 @@ export async function processJobInBackground(jobId: string) {
       
       console.log(`Processing batch ${Math.floor(batchStart / BATCH_SIZE) + 1}: requests ${batchStart + 1}-${batchEnd} of ${requests.length}`)
 
+      // Save current progress before processing batch
+      await supabase
+        .from('bulk_finder_jobs')
+        .update({
+          current_index: batchStart,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId)
+
       // Process batch concurrently
       const batchPromises = batch.map(async (request, batchIndex) => {
         const globalIndex = batchStart + batchIndex
         
         try {
           request.status = 'processing'
+          console.log(`Processing request ${globalIndex + 1}/${requests.length}: ${request.full_name} @ ${request.domain}`)
 
           // Check if user has credits before processing
           const { data: userProfile, error: profileError } = await supabase
@@ -163,7 +176,7 @@ export async function processJobInBackground(jobId: string) {
             .single()
           
           if (profileError || !userProfile) {
-            console.error('Error getting user profile:', profileError)
+            console.error(`Error getting user profile for request ${globalIndex + 1}:`, profileError)
             request.status = 'failed'
             request.error = 'Failed to access user profile'
             return { success: false, index: globalIndex }
@@ -203,13 +216,23 @@ export async function processJobInBackground(jobId: string) {
           }
 
           // Find email
+          console.log(`Calling email finder API for request ${globalIndex + 1}`)
           const result = await findEmail({
             full_name: request.full_name,
             domain: request.domain,
             role: request.role
           })
 
+          console.log(`Email finder API response for request ${globalIndex + 1}:`, {
+            status: result.status,
+            email: result.email ? 'found' : 'not found',
+            message: result.message
+          })
+
+          // Handle different result statuses
           if (result.status === 'valid' && result.email) {
+            // Email found and verified - count as success for UI
+            console.log(`✅ Success ${globalIndex + 1}: Found email for ${request.full_name}`)
             request.status = 'completed'
             request.email = result.email
             request.confidence = result.confidence
@@ -217,16 +240,34 @@ export async function processJobInBackground(jobId: string) {
             request.user_name = result.user_name
             request.mx = result.mx
             return { success: true, index: globalIndex }
+          } else if (result.status === 'invalid') {
+            // No email found - completed processing but not a "success" for UI count
+            console.log(`❌ No email found for request ${globalIndex + 1}: ${request.full_name}`)
+            request.status = 'completed'
+            request.email = undefined
+            request.confidence = result.confidence || 0
+            request.catch_all = result.catch_all
+            request.user_name = result.user_name
+            request.mx = result.mx
+            request.error = result.message || 'No email found for this person'
+            return { success: false, index: globalIndex }
           } else {
+            // API error or other failure
+            console.error(`🚨 API Error for request ${globalIndex + 1}:`, {
+              name: request.full_name,
+              domain: request.domain,
+              status: result.status,
+              message: result.message
+            })
             request.status = 'failed'
-            request.error = result.message || 'Email not found'
+            request.error = result.message || 'Email finding service error'
             return { success: false, index: globalIndex }
           }
 
         } catch (error) {
-          console.error(`Error processing request ${globalIndex}:`, error)
+          console.error(`💥 Unexpected error processing request ${globalIndex + 1} (${request.full_name} @ ${request.domain}):`, error)
           request.status = 'failed'
-          request.error = 'Processing error'
+          request.error = error instanceof Error ? error.message : 'Processing error'
           return { success: false, index: globalIndex }
         }
       })
@@ -262,11 +303,17 @@ export async function processJobInBackground(jobId: string) {
         console.error(`Error updating progress for job ${jobId}:`, progressError)
       }
 
-      console.log(`Batch completed: ${batchResults.filter(r => r.success).length}/${batchResults.length} successful`)
+      const successfulInBatch = batchResults.filter(r => r.success).length
+      const failedInBatch = batchResults.length - successfulInBatch
+      console.log(`📊 Batch completed: ${successfulInBatch}/${batchResults.length} successful, ${failedInBatch} failed`)
+      console.log(`📈 Total progress: ${successCount} successful, ${failedCount} failed out of ${processedCount} processed`)
       
-      // Add small delay between batches to prevent overwhelming the API
+      // Add delay between batches to prevent overwhelming the API
+      // Increase delay if we're seeing failures to give the API time to recover
       if (batchEnd < requests.length) {
-        await new Promise(resolve => setTimeout(resolve, 200))
+        const delayMs = failedInBatch > 0 ? 1000 : 500 // Longer delay if there were failures
+        console.log(`⏱️ Waiting ${delayMs}ms before next batch...`)
+        await new Promise(resolve => setTimeout(resolve, delayMs))
       }
     }
 

@@ -123,28 +123,53 @@ export async function submitBulkFinderJob(requests: BulkFindRequest[], filename?
       }
     }
 
-    // Trigger background processing directly
+    // Add job to the queue for reliable background processing
     try {
-      // Import and call the background processing function from utility file
-      const { processJobInBackground } = await import('@/lib/bulk-finder-processor')
+      const { getJobQueue } = await import('@/lib/job-queue')
+      const jobQueue = getJobQueue()
       
-      // Start background processing without waiting for it to complete
-      processJobInBackground(jobId).catch(async (error) => {
-        // Update job status to failed if background processing fails
-        try {
-          await supabase
-            .from('bulk_finder_jobs')
-            .update({ 
-              status: 'failed',
-              error_message: error.message || 'Background processing failed'
-            })
-            .eq('id', jobId)
-        } catch (updateError) {
-          console.error('Failed to update job status to failed:', updateError)
-        }
-      })
+      const success = await jobQueue.addJob(jobId)
+      if (!success) {
+        console.error('Failed to add job to queue, falling back to direct processing')
+        
+        // Fallback to direct processing
+        const { processJobInBackground } = await import('@/lib/bulk-finder-processor')
+        processJobInBackground(jobId).catch(async (error) => {
+          try {
+            await supabase
+              .from('bulk_finder_jobs')
+              .update({ 
+                status: 'failed',
+                error_message: error.message || 'Background processing failed'
+              })
+              .eq('id', jobId)
+          } catch (updateError) {
+            console.error('Failed to update job status to failed:', updateError)
+          }
+        })
+      }
     } catch (error) {
-      console.error('Error triggering background processing:', error)
+      console.error('Error adding job to queue:', error)
+      
+      // Fallback to direct processing
+      try {
+        const { processJobInBackground } = await import('@/lib/bulk-finder-processor')
+        processJobInBackground(jobId).catch(async (error) => {
+          try {
+            await supabase
+              .from('bulk_finder_jobs')
+              .update({ 
+                status: 'failed',
+                error_message: error.message || 'Background processing failed'
+              })
+              .eq('id', jobId)
+          } catch (updateError) {
+            console.error('Failed to update job status to failed:', updateError)
+          }
+        })
+      } catch (fallbackError) {
+        console.error('Error in fallback processing:', fallbackError)
+      }
     }
 
     revalidatePath('/(dashboard)', 'layout')

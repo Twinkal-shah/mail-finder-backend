@@ -172,49 +172,91 @@ export default function BulkFinderPage() {
     initializeAndLoad()
   }, [])
 
-  // Poll current job status
+  // Poll current job status with resilient error handling
   useEffect(() => {
     if (currentJob && (currentJob.status === 'pending' || currentJob.status === 'processing')) {
-      const interval = setInterval(async () => {
-        const result = await getBulkFinderJobStatus(currentJob.jobId)
-        if (result.success && result.job) {
-          setCurrentJob(result.job)
+      let retryCount = 0
+      let pollInterval = 2000 // Start with 2 seconds
+      let timeoutId: NodeJS.Timeout
+
+      const pollJobStatus = async () => {
+        try {
+          const result = await getBulkFinderJobStatus(currentJob.jobId)
           
-          // Update rows with job data if available
+          if (result.success && result.job) {
+            // Reset retry count on successful poll
+            retryCount = 0
+            pollInterval = 2000
+            
+            setCurrentJob(result.job)
+            
+            // Update rows with job data if available
             if (result.job.requestsData) {
               const updatedRows = result.job.requestsData.map((req: BulkFindRequest, index: number) => ({
-               id: `row-${index}`,
-               fullName: req.full_name,
-               domain: req.domain,
-               role: req.role,
-               email: req.email,
-               confidence: req.confidence,
-               status: req.status || 'pending',
-               catch_all: req.catch_all,
-               user_name: req.user_name,
-               mx: req.mx,
-               error: req.error
-             }))
-            setRows(updatedRows)
-          }
-          
-          // Stop polling if job is completed
-          if (result.job.status === 'completed' || result.job.status === 'failed') {
-            clearInterval(interval)
-            loadUserJobs() // Refresh job history
-            // Invalidate queries for real-time credit updates
-            invalidateCreditsData()
-            
-            if (result.job.status === 'completed') {
-              toast.success('Bulk finder job completed!')
-            } else {
-              toast.error('Bulk finder job failed')
+                id: `row-${index}`,
+                fullName: req.full_name,
+                domain: req.domain,
+                role: req.role,
+                email: req.email,
+                confidence: req.confidence,
+                status: req.status || 'pending',
+                catch_all: req.catch_all,
+                user_name: req.user_name,
+                mx: req.mx,
+                error: req.error
+              }))
+              setRows(updatedRows)
             }
+            
+            // Stop polling if job is completed
+            if (result.job.status === 'completed' || result.job.status === 'failed') {
+              clearTimeout(timeoutId)
+              
+              // Add a small delay to ensure database is fully updated before refreshing job history
+              setTimeout(() => {
+                loadUserJobs() // Refresh job history
+              }, 500)
+              
+              // Invalidate queries for real-time credit updates
+              invalidateCreditsData()
+              
+              if (result.job.status === 'completed') {
+                toast.success('Bulk finder job completed!')
+              } else {
+                toast.error('Bulk finder job failed')
+              }
+              return
+            }
+          } else {
+            console.warn('Failed to get job status:', result.error)
+            retryCount++
+          }
+        } catch (error) {
+          console.error('Error polling job status:', error)
+          retryCount++
+          
+          // Show user-friendly message for connection issues
+          if (retryCount === 1) {
+            console.log('Connection issue detected, retrying in background...')
           }
         }
-      }, 2000) // Poll every 2 seconds
+        
+        // Exponential backoff for retries, max 30 seconds
+        if (retryCount > 0) {
+          pollInterval = Math.min(2000 * Math.pow(2, retryCount - 1), 30000)
+        }
+        
+        // Schedule next poll
+        timeoutId = setTimeout(pollJobStatus, pollInterval)
+      }
 
-      return () => clearInterval(interval)
+      // Start polling
+      pollJobStatus()
+
+      // Cleanup function
+       return () => {
+         clearTimeout(timeoutId)
+       }
     }
   }, [currentJob, invalidateCreditsData])
 
@@ -266,6 +308,12 @@ export default function BulkFinderPage() {
         )
         if (activeJob) {
           setCurrentJob(activeJob)
+        } else if (currentJob) {
+          // If currentJob exists but is completed, update it with the latest data from job history
+          const updatedCurrentJob = formattedJobs.find(job => job.jobId === currentJob.jobId)
+          if (updatedCurrentJob && (updatedCurrentJob.status === 'completed' || updatedCurrentJob.status === 'failed')) {
+            setCurrentJob(updatedCurrentJob)
+          }
         }
       }
     } catch (error) {

@@ -116,22 +116,41 @@ export async function findEmailReal(request: EmailFinderRequest): Promise<EmailF
         ver_ops: data.ver_ops
       }
     } catch (error) {
-      console.error(`Email finder API error (attempt ${attempt}/${maxRetries}):`, error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      const isTimeout = error instanceof Error && error.name === 'AbortError'
+      const isConnectionRefused = errorMessage.includes('ECONNREFUSED') || errorMessage.includes('fetch failed')
+      
+      console.error(`🔥 Email finder API error (attempt ${attempt}/${maxRetries}) for ${request.full_name} @ ${request.domain}:`, {
+        error: errorMessage,
+        isTimeout,
+        isConnectionRefused,
+        errorType: error instanceof Error ? error.name : 'Unknown'
+      })
       
       // If this is the last attempt, return error result
       if (attempt === maxRetries) {
+        let finalMessage = 'Failed to find email due to API error'
+        
+        if (isTimeout) {
+          finalMessage = 'Request timed out after 30 seconds'
+        } else if (isConnectionRefused) {
+          finalMessage = 'Unable to connect to email finder service'
+        } else if (errorMessage.includes('429') || errorMessage.includes('rate limit')) {
+          finalMessage = 'Rate limit exceeded - too many requests'
+        }
+        
         return {
           email: null,
           confidence: 0,
           status: 'error',
-          message: error instanceof Error && error.name === 'AbortError' 
-            ? 'Request timed out after 30 seconds'
-            : 'Failed to find email due to API error'
+          message: finalMessage
         }
       }
       
       // Wait before retrying (exponential backoff)
-      await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000))
+      const backoffDelay = Math.pow(2, attempt) * 1000
+      console.log(`⏳ Retrying in ${backoffDelay}ms...`)
+      await new Promise(resolve => setTimeout(resolve, backoffDelay))
     }
   }
   

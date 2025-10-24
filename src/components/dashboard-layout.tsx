@@ -22,8 +22,8 @@ import {
   LogOut,
   Menu,
   X,
-  Key,
   PlayCircle,
+  Code2,
 } from 'lucide-react'
 import { getProfileDataClient } from '@/lib/profile'
 import { OnboardingFlow } from '@/components/onboarding-flow'
@@ -60,9 +60,9 @@ const getNavigation = (userPlan: string) => {
     },
   ]
 
-  // Add API page for agency or lifetime plan users
+  // Add API Testing page for agency or lifetime plan users
   if (userPlan === 'agency' || userPlan === 'lifetime') {
-    baseNavigation[1].items.push({ name: 'API', href: '/api', icon: Key })
+    baseNavigation[1].items.push({ name: 'API Testing', href: '/api-calls', icon: Code2 })
   }
 
   // Add Video Tutorials section for agency or lifetime plan users
